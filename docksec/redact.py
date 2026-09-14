@@ -25,18 +25,27 @@ _SECRET_KEY = re.compile(
 
 # Values that look like secret material regardless of the key name.
 _SECRET_VALUE_PATTERNS = [
-    re.compile(r"AKIA[0-9A-Z]{16}"),                    # AWS access key id
-    re.compile(r"ghp_[A-Za-z0-9]{36,}"),                # GitHub personal access token
-    re.compile(r"gho_[A-Za-z0-9]{36,}"),                # GitHub OAuth token
-    re.compile(r"github_pat_[A-Za-z0-9_]{22,}"),        # GitHub fine-grained PAT
-    re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}"),        # Slack token
-    re.compile(r"sk-[A-Za-z0-9_-]{20,}"),               # OpenAI-style API key
+    re.compile(r"AKIA[0-9A-Z]{16}"),  # AWS access key id
+    re.compile(r"ghp_[A-Za-z0-9]{36,}"),  # GitHub personal access token
+    re.compile(r"gho_[A-Za-z0-9]{36,}"),  # GitHub OAuth token
+    re.compile(r"github_pat_[A-Za-z0-9_]{22,}"),  # GitHub fine-grained PAT
+    re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}"),  # Slack token
+    re.compile(r"sk-[A-Za-z0-9_-]{20,}"),  # OpenAI-style API key
     re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}"),  # JWT
 ]
 
 _PRIVATE_KEY_BLOCK = re.compile(
     r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?(?:-----END [A-Z ]*PRIVATE KEY-----|\Z)",
     re.DOTALL,
+)
+
+# Credentials embedded in a URL userinfo: scheme://user:password@host. Common in
+# DB and broker URLs (DATABASE_URL, REDIS_URL, AMQP_URL, MONGO_URI, ...) whose
+# key names do not look secret, so the password would otherwise slip through
+# both the key-based and the value-shaped checks. Only the password is masked;
+# the scheme, user, and host stay visible so the model can still flag it.
+_URL_CREDENTIALS = re.compile(
+    r"(?P<prefix>[a-zA-Z][a-zA-Z0-9+.-]*://[^:@/\s]*:)(?P<pw>[^@/\s]+)(?P<at>@)"
 )
 
 # KEY=value pairs (Dockerfile ENV/ARG, compose list-style environment, .env
@@ -89,15 +98,31 @@ def redact_content(content: str) -> Tuple[str, int]:
 
         if line == original:
             m = _ASSIGN_COLON.match(line)
-            if m and _SECRET_KEY.search(m.group("key")) and not _is_placeholder(m.group("val")):
+            if (
+                m
+                and _SECRET_KEY.search(m.group("key"))
+                and not _is_placeholder(m.group("val"))
+            ):
                 count += 1
                 line = f"{m.group('lead')}{m.group('key')}: {REDACTED}"
 
         if line == original:
             m = _ENV_SPACE.match(line)
-            if m and _SECRET_KEY.search(m.group("key")) and not _is_placeholder(m.group("val")):
+            if (
+                m
+                and _SECRET_KEY.search(m.group("key"))
+                and not _is_placeholder(m.group("val"))
+            ):
                 count += 1
                 line = f"{m.group('lead')}{m.group('key')} {REDACTED}"
+
+        # Passwords embedded in URL userinfo (scheme://user:password@host).
+        def _sub_url(match: re.Match) -> str:
+            nonlocal count
+            count += 1
+            return f"{match.group('prefix')}{REDACTED}{match.group('at')}"
+
+        line = _URL_CREDENTIALS.sub(_sub_url, line)
 
         # Value-shaped secrets (AWS keys, PATs, JWTs, ...) regardless of key name.
         for pattern in _SECRET_VALUE_PATTERNS:
