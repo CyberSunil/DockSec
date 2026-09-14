@@ -86,6 +86,9 @@ pip install "docksec[ai]"
 pip install docksec
 ```
 
+Or skip installing Python dependencies entirely and run DockSec via Docker - see
+[Run with Docker](#run-with-docker) below.
+
 ### 3. Run your first scan
 
 No API key needed for local scanning:
@@ -143,6 +146,34 @@ API keys, private key blocks) are masked automatically. See
     dockerfile: 'Dockerfile'
     openai_api_key: ${{ secrets.OPENAI_API_KEY }}
 ```
+
+---
+
+## Run with Docker
+
+No Python install needed. The image ships the scan-only core (Trivy + Hadolint,
+scoring, reports) - no LLM stack, no API key required.
+
+```bash
+docker pull owasp/docksec
+
+docker run --rm -v "$PWD":/workspace owasp/docksec Dockerfile --scan-only
+```
+
+To scan a built image, mount the Docker socket so DockSec can talk to your host's
+Docker daemon:
+
+```bash
+docker run --rm \
+  -v "$PWD":/workspace \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  owasp/docksec Dockerfile -i myapp:latest --scan-only
+```
+
+Mounting the Docker socket gives the container the same access as the host's Docker
+daemon - only do this on a Dockerfile/image you trust. AI analysis (`--ai-only`, or
+omitting `--scan-only`) is not available in this image; run `pip install "docksec[ai]"`
+locally for that.
 
 ---
 
