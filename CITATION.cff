@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "OWASP DockSec"
+abstract: "An AI-powered Docker security scanner that explains vulnerabilities in plain English."
+authors:
+  - family-names: "Patel"
+    given-names: "Advait"
+repository-code: "https://github.com/OWASP/DockSec"
+license: MIT
+version: "2026.8.19"
