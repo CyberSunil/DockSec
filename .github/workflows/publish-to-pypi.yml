@@ -12,7 +12,10 @@ jobs:
   update-version:
     runs-on: ubuntu-latest
     permissions:
+      # contents to create and push the tag; pull-requests to open the
+      # follow-up PR that records the bump on main.
       contents: write
+      pull-requests: write
     outputs:
       version: ${{ steps.set_version.outputs.VERSION }}
     steps:
@@ -54,18 +57,56 @@ jobs:
           grep -q "^version: \"${VERSION}\"" CITATION.cff \
             || { echo "::error::CITATION.cff version was not updated to ${VERSION}"; exit 1; }
 
-      - name: Commit and push version update
+      # The tag carries the version, and it is created from the bumped tree
+      # without that commit ever landing on main. main is a protected branch
+      # requiring pull requests and status checks, and the bot pushing directly
+      # to it was both rejected (GH006) and the wrong thing to want: a release
+      # workflow should not be the one actor allowed to bypass review.
+      #
+      # `git tag` on a detached commit still records the full tree, so the
+      # tagged source has the correct version in pyproject.toml even though
+      # main does not yet.
+      - name: Create and push the release tag
+        env:
+          VERSION: ${{ github.event.inputs.version }}
         run: |
+          set -euo pipefail
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add pyproject.toml CITATION.cff
-          # Only commit if there are changes
-          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: bump version to ${{ github.event.inputs.version }}" && git push)
 
-      - name: Create and push tag
+          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+            echo "::error::tag v${VERSION} already exists"
+            exit 1
+          fi
+
+          git add pyproject.toml CITATION.cff
+          git commit -m "chore: release ${VERSION}"
+          git tag -a "v${VERSION}" -m "DockSec ${VERSION}"
+          git push origin "v${VERSION}"
+          echo "Tagged v${VERSION} (not pushed to main; see the follow-up PR)"
+
+      # Record the bump on main through the normal review path, so the branch
+      # does not permanently disagree with the released version. A pre-release
+      # is skipped: main should keep pointing at the last real release.
+      - name: Open a pull request recording the version bump
+        if: ${{ !contains(github.event.inputs.version, 'rc') && !contains(github.event.inputs.version, '-') }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ github.event.inputs.version }}
         run: |
-          git tag v${{ github.event.inputs.version }}
-          git push origin v${{ github.event.inputs.version }}
+          set -euo pipefail
+          branch="release/bump-${VERSION}"
+          git push origin "HEAD:refs/heads/${branch}"
+          gh pr create \
+            --base main \
+            --head "${branch}" \
+            --title "chore: record version bump to ${VERSION}" \
+            --body "Records the version released as \`v${VERSION}\`.
+
+          The tag was created from this tree and the artifacts are already
+          published; this PR only brings \`main\` into agreement so the branch
+          does not report a stale version." \
+            || echo "::warning::could not open the bump PR; raise it by hand"
 
   publish-pypi:
     needs: update-version
