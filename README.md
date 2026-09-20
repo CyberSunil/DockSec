@@ -156,8 +156,8 @@ docker run --rm -v "$PWD:/github/workspace" \
 ```
 
 Published multi-arch (amd64 and arm64) on every release. Pin to a specific
-version (`ghcr.io/owasp/docksec:2026.8.19`) or a minor series
-(`ghcr.io/owasp/docksec:2026.8`) rather than `latest` in CI. Every image carries
+version (`ghcr.io/owasp/docksec:2026.9.21`) or a minor series
+(`ghcr.io/owasp/docksec:2026.9`) rather than `latest` in CI. Every image carries
 a build provenance attestation:
 
 ```bash
@@ -182,7 +182,7 @@ docker run --rm -v "$PWD:/github/workspace" \
 
 ```yaml
 - name: Run DockSec AI Scanner
-  uses: OWASP/DockSec@v2026.8.19
+  uses: OWASP/DockSec@v2026.9.21
   with:
     dockerfile: 'Dockerfile'
     openai_api_key: ${{ secrets.OPENAI_API_KEY }}
@@ -484,7 +484,7 @@ directly on pull requests and in the Security tab:
 
 ```yaml
 - name: Run DockSec
-  uses: OWASP/DockSec@v2026.8.19
+  uses: OWASP/DockSec@v2026.9.21
   with:
     dockerfile: 'Dockerfile'
     sarif: 'true'
