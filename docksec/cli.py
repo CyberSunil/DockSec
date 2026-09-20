@@ -9,9 +9,9 @@ def get_version() -> str:
     """Return the installed package version.
 
     Resolution order:
-    1. importlib.metadata  — works when installed via pip
-    2. setup.py on disk    — works when running from source
-    3. 'unknown'           — last resort fallback
+    1. importlib.metadata   — works when installed via pip
+    2. pyproject.toml       — works when running from a source checkout
+    3. 'unknown'            — last resort fallback
     """
     try:
         from importlib.metadata import version
@@ -21,12 +21,18 @@ def get_version() -> str:
 
     try:
         import re
-        setup_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'setup.py')
-        with open(setup_path, 'r') as f:
-            match = re.search(r'version\s*=\s*["\']([^"\']+)["\']', f.read())
+        pyproject = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), 'pyproject.toml'
+        )
+        with open(pyproject, 'r', encoding='utf-8') as f:
+            # Match the version in [project] only, not a version constraint in
+            # a dependency specifier further down the file.
+            match = re.search(
+                r'^\s*version\s*=\s*["\']([^"\']+)["\']', f.read(), re.MULTILINE
+            )
             if match:
                 return match.group(1)
-    except Exception:  # setup.py missing or unreadable; fall through to unknown
+    except Exception:  # pyproject missing or unreadable; fall through to unknown
         pass
 
     return "unknown"

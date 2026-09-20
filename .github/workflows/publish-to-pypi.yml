@@ -25,15 +25,40 @@ jobs:
         id: set_version
         run: echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
 
-      - name: Update setup.py version
+      # The version lives in pyproject.toml (the packaging source of truth) and
+      # is mirrored in CITATION.cff. Both are rewritten here and the result is
+      # verified, because a sed that silently matches nothing would otherwise
+      # publish the previous version under a new tag.
+      - name: Update version
+        env:
+          VERSION: ${{ github.event.inputs.version }}
         run: |
-          sed -i 's/version=".*"/version="${{ github.event.inputs.version }}"/' setup.py
-          
+          set -euo pipefail
+
+          # Exactly one line may start with `version = ` at column zero: the one
+          # in [project]. Dependency specifiers are indented inside arrays, so a
+          # column-anchored substitution cannot touch them. Assert that before
+          # editing rather than trusting it.
+          matches="$(grep -c '^version = ' pyproject.toml || true)"
+          if [ "$matches" -ne 1 ]; then
+            echo "::error::expected exactly one top-level version in pyproject.toml, found ${matches}"
+            exit 1
+          fi
+
+          sed -i "s|^version = \".*\"|version = \"${VERSION}\"|" pyproject.toml
+          sed -i "s|^version: \".*\"|version: \"${VERSION}\"|" CITATION.cff
+
+          # A sed that matches nothing exits 0, so verify rather than assume.
+          grep -q "^version = \"${VERSION}\"" pyproject.toml \
+            || { echo "::error::pyproject.toml version was not updated to ${VERSION}"; exit 1; }
+          grep -q "^version: \"${VERSION}\"" CITATION.cff \
+            || { echo "::error::CITATION.cff version was not updated to ${VERSION}"; exit 1; }
+
       - name: Commit and push version update
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add setup.py
+          git add pyproject.toml CITATION.cff
           # Only commit if there are changes
           git diff --quiet && git diff --staged --quiet || (git commit -m "chore: bump version to ${{ github.event.inputs.version }}" && git push)
 

@@ -134,7 +134,42 @@ Before any content is sent to an AI provider, secret-looking values (passwords, 
 API keys, private key blocks) are masked automatically. See
 [Data flow and privacy](#data-flow-and-privacy).
 
-### 5. Or use the GitHub Action
+### 5. Or run the container image (nothing to install)
+
+The published image bundles pinned versions of Trivy and Hadolint, so there is
+nothing to install and nothing to configure:
+
+```bash
+docker run --rm -v "$PWD:/github/workspace" \
+  -e INPUT_DOCKERFILE=Dockerfile \
+  -e INPUT_SCAN_ONLY=true \
+  ghcr.io/owasp/docksec:latest
+```
+
+Published multi-arch (amd64 and arm64) on every release. Pin to a specific
+version (`ghcr.io/owasp/docksec:2026.8.19`) or a minor series
+(`ghcr.io/owasp/docksec:2026.8`) rather than `latest` in CI. Every image carries
+a build provenance attestation:
+
+```bash
+gh attestation verify oci://ghcr.io/owasp/docksec:latest --repo OWASP/DockSec
+```
+
+The image reads the same `INPUT_*` variables as the GitHub Action, so any Action
+input works here: `INPUT_IMAGE`, `INPUT_COMPOSE`, `INPUT_SEVERITY`,
+`INPUT_FAIL_ON`, `INPUT_FORMAT`, `INPUT_SARIF`, `INPUT_OUTPUT_DIR`. Write reports
+somewhere on the mount to keep them after the container exits:
+
+```bash
+docker run --rm -v "$PWD:/github/workspace" \
+  -e INPUT_COMPOSE=docker-compose.yml \
+  -e INPUT_SCAN_ONLY=true \
+  -e INPUT_FORMAT=json,html \
+  -e INPUT_OUTPUT_DIR=/github/workspace/docksec-reports \
+  ghcr.io/owasp/docksec:latest
+```
+
+### 6. Or use the GitHub Action
 
 ```yaml
 - name: Run DockSec AI Scanner

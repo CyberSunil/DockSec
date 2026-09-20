@@ -15,9 +15,16 @@ RUN apt-get update && apt-get install -y \
 # -f is required: without it curl exits 0 on an HTTP error and writes the error
 # page to the destination, producing a "successful" build with a text file where
 # the binary should be.
-RUN curl -fsSL -o /usr/local/bin/hadolint \
-        "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-x86_64" \
-    && chmod +x /usr/local/bin/hadolint
+RUN set -eux; \
+    arch="$(dpkg --print-architecture)"; \
+    case "$arch" in \
+        amd64) hadolint_arch='x86_64' ;; \
+        arm64) hadolint_arch='arm64' ;; \
+        *) echo "unsupported architecture: $arch" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL -o /usr/local/bin/hadolint \
+        "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-${hadolint_arch}"; \
+    chmod +x /usr/local/bin/hadolint
 
 # Install Trivy from the release tarball rather than the install script, so the
 # download is version-addressed and a redirect or a moved script cannot silently

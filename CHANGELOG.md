@@ -91,6 +91,42 @@ All notable changes to DockSec are documented in this file.
   renders natively in pull request comments and CI/CD job summaries. Opt-in, so
   the default report output is unchanged.
 
+### Added (container image)
+
+- **The container image is now published to GitHub Container Registry**, so a
+  scan needs nothing installed but Docker:
+
+  ```bash
+  docker run --rm -v "$PWD:/github/workspace" \
+    -e INPUT_DOCKERFILE=Dockerfile -e INPUT_SCAN_ONLY=true \
+    ghcr.io/owasp/docksec:latest
+  ```
+
+  Published multi-arch (amd64 and arm64) on every release tag, with pinned Trivy
+  and Hadolint baked in. Tags follow the release: `:2026.9.20`, `:2026.9`, and
+  `:latest`. The publish workflow builds amd64 first, runs a real scan against
+  it, and only pushes if that scan produces a report - an image that builds but
+  cannot scan is never published. Each image carries a build provenance
+  attestation verifiable with `gh attestation verify`.
+- The Hadolint install in the image is now architecture-aware. It previously
+  hardcoded the `x86_64` binary, which would have produced an arm64 image
+  containing an unrunnable Hadolint rather than failing the build.
+
+### Changed (packaging)
+
+- **`setup.py` is gone; `pyproject.toml` is the single source of packaging
+  metadata**, including the version. The two files coexisted with the version
+  defined only in `setup.py`, while `CITATION.cff` and the README's Action pins
+  were updated by hand at release time - the drift this invites had already
+  happened. The release workflow now rewrites the version in both
+  `pyproject.toml` and `CITATION.cff`, and verifies each edit landed: a `sed`
+  that matches nothing exits 0, so an unverified substitution would publish the
+  previous version under a new tag.
+- `get_version()`'s source-checkout fallback reads `pyproject.toml` instead of
+  `setup.py`.
+- The generated wheel is unchanged by this move: same 23 files, same metadata,
+  same `docksec` entry point, verified by diffing builds from before and after.
+
 ### Repository housekeeping
 
 - `SECURITY.md` moved from `docs/` to the repository root, where GitHub picks it
