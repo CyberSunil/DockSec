@@ -4,7 +4,41 @@ All notable changes to DockSec are documented in this file.
 
 ## Unreleased
 
+### Changed (breaking: security score)
+
+- **The security score now weights severity over volume, so most scores will
+  move - usually downward.** The bundled insecure compose example scored
+  `60.5/100 "FAIR"` while mounting the Docker socket, running `privileged: true`
+  and host networking, and carrying two plaintext passwords. It now scores
+  `0.8/100`. The hardened example scores `89.3`. Four defects caused the old
+  number:
+  - Findings were deducted additively, so fifty LOW findings outweighed three
+    CRITICALs. Deductions are now damped by count and each severity imposes a
+    ceiling, so a single CRITICAL always outranks any number of LOW findings.
+  - The Dockerfile axis scored 95/100 when there was no Dockerfile at all. Axes
+    that were not measured are now excluded from the average rather than
+    contributing a near-perfect score.
+  - Compose misconfigurations never reached the configuration axis, so a stack
+    mounting the Docker socket scored a clean 100 there.
+  - The credential cap inspected Dockerfile `ENV` only, so a compose file with a
+    plaintext password was never capped.
+
+  Findings that represent an unambiguous compromise - a mounted Docker socket, a
+  privileged container, host networking or namespaces, dangerous capabilities, a
+  plaintext credential - now cap the overall score directly.
+
+  `score_version` is included in `--json` output and the JSON report (currently
+  `2`) so automation can distinguish a scoring-model change from a real change
+  in posture. **Baselines and waivers are unaffected**: they match on finding
+  fingerprints, not scores, so nothing needs to be re-baselined.
+
 ### Fixed
+
+- Compose environment variables ending in `_FILE`, `_PATH`, or `_FILEPATH` are
+  no longer reported as plaintext secrets. `POSTGRES_PASSWORD_FILE=/run/secrets/
+  db_password` is the Docker secrets pattern and holds a path, not a credential;
+  flagging it penalized the recommended practice. The bundled hardened example
+  was itself being flagged for this.
 
 - **The container image and GitHub Action now work.** The image installed Trivy
   from `raw.githubusercontent.com/aquasec/trivy/...`; the organization is

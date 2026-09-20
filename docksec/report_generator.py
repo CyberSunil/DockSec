@@ -22,6 +22,7 @@ from typing import Dict, List, Optional
 
 from docksec import output
 from docksec.config import RESULTS_DIR, TEMPLATES_DIR
+from docksec.score_calculator import SCORE_VERSION
 from docksec.utils import get_custom_logger
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -113,6 +114,7 @@ class ReportGenerator:
                     "timestamp", datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 ),
                 "analysis_score": self.analysis_score,
+                "score_version": SCORE_VERSION,
                 "scan_mode": results.get("scan_mode", "full"),
             },
             "vulnerabilities": json_results,
