@@ -751,6 +751,7 @@ def _print_json_results(results, scanner, report_paths):
     import json as json_module
 
     from docksec import output
+    from docksec.score_calculator import SCORE_VERSION
 
     vulnerabilities = results.get("json_data", [])
     payload = {
@@ -759,6 +760,9 @@ def _print_json_results(results, scanner, report_paths):
             "dockerfile": results.get("dockerfile_path", "N/A"),
             "scan_time": results.get("timestamp", ""),
             "analysis_score": getattr(scanner, "analysis_score", None),
+            # Identifies the scoring model, so automation can distinguish a
+            # model change from a real change in posture.
+            "score_version": SCORE_VERSION,
             "scan_mode": results.get("scan_mode", "full"),
         },
         "vulnerabilities": vulnerabilities,
