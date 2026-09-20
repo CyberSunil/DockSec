@@ -130,6 +130,28 @@ class TestCommentFitsGithubsLimit(unittest.TestCase):
         self.assertNotIn("more file(s) not shown", out)
 
 
+class TestEscapeHelper(unittest.TestCase):
+    """`_md` is the single choke point every untrusted value passes through,
+    so it is worth testing directly rather than only through rendered output."""
+
+    def test_empty_becomes_a_placeholder(self):
+        self.assertEqual(_md(""), "-")
+        self.assertEqual(_md(None), "-")
+
+    def test_whitespace_is_collapsed(self):
+        self.assertEqual(_md("a\n\n   b\tc"), "a b c")
+
+    def test_table_metacharacters_are_escaped(self):
+        for char in ("|", "`", "*", "_", "[", "]"):
+            self.assertIn("\\" + char, _md(f"x{char}y"))
+
+    def test_angle_brackets_become_entities(self):
+        self.assertNotIn("<", _md("<script>").replace("\\<", ""))
+
+    def test_truncation_respects_the_limit(self):
+        self.assertLessEqual(len(_md("A" * 999, limit=50)), 60)
+
+
 class TestOrdering(unittest.TestCase):
     """The comment must lead with what to fix first, like the CLI does."""
 
