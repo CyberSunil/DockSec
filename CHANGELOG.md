@@ -4,6 +4,76 @@ All notable changes to DockSec are documented in this file.
 
 ## Unreleased
 
+### Added (findings, priority, and fixes)
+
+- **Dockerfile findings are now first-class.** Hadolint output was a text blob:
+  absent from `json_data`, from `--json`, from SARIF, and from the `--fail-on`
+  gate, so CI could pass on a root-user Dockerfile that shipped a plaintext
+  credential. Hadolint now emits structured findings, and Trivy's `config`
+  scanner - which detects the same class of issue with stable AVD IDs, real
+  severities, and remediation text - runs alongside it. Both flow through
+  scoring, reports, waivers, `--json`, SARIF, and the gate exactly as image
+  vulnerabilities do.
+
+  Both scanners run because neither is a superset: Hadolint alone catches
+  unpinned apt versions and uncleaned apt lists, while Trivy alone catches a
+  bare `apt-get update`, a missing HEALTHCHECK, and secrets in `ENV` (at
+  CRITICAL). Where the two overlap, the Trivy finding is kept - its IDs are
+  stable and externally documented, and its severities are real rather than
+  lint levels - and the Hadolint line number is carried across if Trivy did not
+  supply one.
+
+- **EPSS priority tiers.** Every CVE finding is scored against the FIRST
+  Exploit Prediction Scoring System and placed in one of four tiers: `Fix Now`,
+  `Fix Soon`, `Monitor`, `Low Priority`. Severity says how bad a finding would
+  be; this says whether anyone is actually exploiting it.
+
+  Only CVE IDs are transmitted - no image names, no file contents, no paths.
+  Scores are cached for 24 hours, `--offline` and the new `--no-epss` disable
+  the lookup, and any failure falls back to severity-only ranking rather than
+  failing the scan.
+
+- **Copy-and-run fix commands.** Scans end with commands that can be pasted
+  (`apt-get install --only-upgrade -y libgnutls30=3.7.9-2+deb12u7`,
+  `npm install tar@7.5.21`) plus concrete Dockerfile and compose changes, and a
+  statement of how many findings applying them resolves - including how many
+  have no mechanical fix. Commands are grouped per package at the highest
+  version any finding requires, so one upgrade covers every CVE against it.
+
+- **Scan completeness reporting.** A `Coverage` block reports what the scan
+  could not determine, split into detection gaps (a scanner failed, so findings
+  may be missing) and remediation gaps (findings are known but fix data is
+  not), alongside standing notes about what DockSec does not examine at all.
+  Exposed in `--json` under `scan_info.completeness`. The new
+  `--incomplete-policy fail` exits `3` on a detection gap so CI cannot pass on a
+  scan that did not finish.
+
+- `--no-epss` and `--incomplete-policy {warn,fail}` flags.
+
+### Fixed
+
+- **Image findings overwrote Dockerfile findings.** `run_full_scan` assigned
+  `results['json_data'] = json_data` after the Dockerfile pass had already
+  populated it, so on a combined Dockerfile + image scan every Dockerfile
+  finding was silently discarded before scoring, reporting, and gating. Found by
+  a test written for the new pipeline.
+- **SARIF results had no line regions.** Region extraction only parsed a line
+  number out of a compose `Target` string, so Dockerfile findings landed on the
+  file with no position and GitHub could not annotate the pull request line that
+  caused them. Dockerfile findings now carry their line into SARIF; 9 of 10
+  findings on the bundled example are anchored (the tenth is a whole-file rule).
+- Fix commands built from Trivy's `FixedVersion` could be unrunnable. Trivy
+  reports every fixed version across an advisory's affected ranges, so npm
+  findings arrive as `"10.2.1, 9.0.6, 8.0.5, ..."` - the whole list was being
+  pasted into the command. The highest version is now selected, compared
+  numerically so `10.2.1` outranks `9.0.6`.
+
+### Changed
+
+- The README's pipeline description no longer claims the AI pass "correlates
+  findings across all scanners". It did not: the AI pass receives only the file
+  content. The description now states what the pipeline actually does.
+
 ### Changed (breaking: security score)
 
 - **The security score now weights severity over volume, so most scores will

@@ -219,6 +219,115 @@ def fix_commands(commands: Iterable[str]) -> None:
         _line(Text.assemble(("  ", "default"), (cmd, "green")))
 
 
+_PRIORITY_STYLES = {
+    "fix_now": "bold red",
+    "fix_soon": "yellow",
+    "monitor": "cyan",
+    "low_priority": "dim",
+}
+
+
+def priority_summary(counts: Dict[str, int]) -> None:
+    """Render the EPSS priority breakdown, most urgent first.
+
+    Severity says how bad a finding would be; this says what to do first.
+    """
+    from docksec.epss import PRIORITY_LABELS, PRIORITY_ORDER
+
+    present = [(tier, counts.get(tier, 0)) for tier in PRIORITY_ORDER]
+    present = [(tier, count) for tier, count in present if count]
+    if is_quiet() or not present:
+        return
+
+    console = get_console()
+    console.print()
+    _line(Text("Priority", style="bold cyan"))
+    for tier, count in present:
+        _line(
+            Text.assemble(
+                ("  ", "default"),
+                (f"{PRIORITY_LABELS[tier]:<13}", _PRIORITY_STYLES.get(tier, "default")),
+                (f" {count}", "bold"),
+            )
+        )
+
+
+def fix_plan(plan) -> None:
+    """Render the remediation plan: concrete commands, then the honest total."""
+    if is_quiet() or plan is None or plan.total_count == 0:
+        return
+
+    console = get_console()
+
+    if plan.package_upgrades:
+        console.print()
+        _line(Text("Fix commands", style="bold cyan"))
+        for item in plan.package_upgrades:
+            ids = ", ".join(item["ids"])
+            more = "" if item["finding_count"] <= len(item["ids"]) else f" +{item['finding_count'] - len(item['ids'])}"
+            _line(Text.assemble(("  > ", "dim"), (item["command"], "green")))
+            _line(
+                Text(
+                    f"      {item['severity']} - {item['installed']} -> {item['fixed']}"
+                    f"  ({ids}{more})",
+                    style="dim",
+                )
+            )
+
+    if plan.dockerfile_edits:
+        console.print()
+        _line(Text("Dockerfile changes", style="bold cyan"))
+        for edit in plan.dockerfile_edits:
+            location = f" (line {edit['line']})" if edit.get("line") else ""
+            _line(
+                Text.assemble(
+                    ("  - ", "cyan"),
+                    (f"[{edit['severity']}] ", "dim"),
+                    (edit["instruction"], "default"),
+                    (location, "dim"),
+                )
+            )
+
+    if plan.compose_edits:
+        console.print()
+        _line(Text("Compose changes", style="bold cyan"))
+        for edit in plan.compose_edits:
+            service = f" ({edit['service']})" if edit.get("service") else ""
+            _line(
+                Text.assemble(
+                    ("  - ", "cyan"),
+                    (f"[{edit['severity']}] ", "dim"),
+                    (edit["instruction"], "default"),
+                    (service, "dim"),
+                )
+            )
+
+    claim = plan.completion_claim()
+    if claim:
+        console.print()
+        _line(Text(claim, style="bold"))
+
+
+def coverage(notes: Iterable[str], gaps: Iterable[str] = ()) -> None:
+    """Render what the scan could not determine, and what it never examines.
+
+    Gaps come first and are styled as warnings: they mean results may be
+    incomplete. Notes are the tool's standing limits, not failures.
+    """
+    gaps = [g for g in gaps if g]
+    notes = [n for n in notes if n]
+    if is_quiet() or (not gaps and not notes):
+        return
+
+    console = get_console()
+    console.print()
+    _line(Text("Coverage", style="bold cyan"))
+    for gap in gaps:
+        _line(Text.assemble(("  ! ", "yellow"), (gap, "yellow")))
+    for note in notes:
+        _line(Text.assemble(("  . ", "dim"), (note, "dim")))
+
+
 def report_results(paths: Dict[str, str], results_dir: str) -> None:
     """List the report formats that were written and where."""
     if is_quiet():
