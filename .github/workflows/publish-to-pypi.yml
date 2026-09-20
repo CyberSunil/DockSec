@@ -73,8 +73,11 @@ jobs:
     environment: pypi-release
     permissions:
       contents: read
+      # id-token for PyPI trusted publishing and Sigstore; attestations to
+      # record the provenance statement against the repository.
       id-token: write
-    
+      attestations: write
+
     steps:
     - name: Checkout code
       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -93,7 +96,18 @@ jobs:
     
     - name: Build package
       run: python -m build
-    
+
+    # Attest the artifacts before publishing them. For a security tool this is
+    # close to table stakes: a consumer can verify the wheel on PyPI was built
+    # by this workflow from this repository, rather than uploaded by hand or by
+    # someone who obtained the API token.
+    #
+    #   gh attestation verify docksec-X.Y.Z-py3-none-any.whl --repo OWASP/DockSec
+    - name: Attest build provenance
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+      with:
+        subject-path: 'dist/*'
+
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
       with:

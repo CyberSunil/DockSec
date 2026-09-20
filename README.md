@@ -669,6 +669,42 @@ DockSec is the only one of these that pairs contextual Dockerfile remediation wi
 
 ---
 
+## Applying fixes automatically
+
+`--fix` applies the mechanical subset of the suggested Dockerfile changes,
+re-scans, and reports the delta:
+
+```bash
+docksec Dockerfile --scan-only --fix --dry-run   # print the diff, change nothing
+docksec Dockerfile --scan-only --fix             # apply, keeping a .bak
+```
+
+```text
+Applied 4 change(s)
+  - added --no-install-recommends on line(s) 2  [DS029]
+  - converted ADD to COPY on line(s) 3  [DL3020]
+  - replaced 'USER root' with 'USER appuser' on line 5  [DS002]
+  - inserted a placeholder HEALTHCHECK before line 6  [DS026]
+
+Original saved to Dockerfile.bak
+Dockerfile findings: 7 -> 2 (5 resolved)
+```
+
+It is deliberately conservative. It will not choose a base image version, move a
+secret, convert an `ADD` that fetches a URL or unpacks an archive, or edit a
+compose file - those are reported under "Needs review" instead. It also refuses
+to edit a file with uncommitted changes unless `--force` is given, so git is
+always in a position to undo the change.
+
+## Documentation
+
+| Guide | What it covers |
+| --- | --- |
+| [Evaluation guide](docs/evaluation-guide.md) | 15-minute assessment, including what DockSec does *not* do |
+| [Exploit chains](docs/exploit-chains.md) | Cross-service attack paths, and their limits |
+| [Compose rule reference](docs/rules/README.md) | All 17 rules: what each catches, and when keeping it is reasonable |
+| [CI integration](docs/ci/README.md) | Jenkins, GitLab, Azure Pipelines, pre-commit |
+
 ## Roadmap
 
 See [ROADMAP.md](ROADMAP.md) for where DockSec is heading: registry scanning without a

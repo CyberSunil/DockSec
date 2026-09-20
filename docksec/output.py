@@ -375,6 +375,93 @@ def ai_analysis(analysis: Dict) -> None:
                 _line(Text.assemble(("      fix: ", "dim"), (finding["fix"], "green")))
 
 
+def fix_diff(diff_text: str, applied, skipped, dry_run: bool = False,
+             backup_path: Optional[str] = None,
+             before: Optional[int] = None, after: Optional[int] = None) -> None:
+    """Render what --fix changed, or would change.
+
+    The diff comes first: a tool editing someone's file should show the edit
+    before summarizing it.
+    """
+    if is_quiet():
+        return
+
+    console = get_console()
+
+    if diff_text:
+        console.print()
+        for line in diff_text.splitlines():
+            if line.startswith("+++") or line.startswith("---"):
+                style = "bold"
+            elif line.startswith("+"):
+                style = "green"
+            elif line.startswith("-"):
+                style = "red"
+            elif line.startswith("@@"):
+                style = "cyan"
+            else:
+                style = "dim"
+            _line(Text(line, style=style))
+
+    if applied:
+        console.print()
+        verb = "Would apply" if dry_run else "Applied"
+        _line(Text(f"{verb} {len(applied)} change(s)", style="bold cyan"))
+        for change in applied:
+            _line(
+                Text.assemble(
+                    ("  - ", "cyan"),
+                    (change.get("description", ""), "default"),
+                    (f"  [{change.get('rule')}]", "dim"),
+                )
+            )
+
+    if skipped:
+        console.print()
+        _line(Text(f"Needs review ({len(skipped)})", style="bold yellow"))
+        for change in skipped[:6]:
+            _line(
+                Text.assemble(
+                    ("  - ", "yellow"),
+                    (change.get("instruction", ""), "default"),
+                )
+            )
+            if change.get("reason"):
+                _line(Text(f"      {change['reason']}", style="dim"))
+        if len(skipped) > 6:
+            _line(Text(f"  ... and {len(skipped) - 6} more", style="dim"))
+
+    console.print()
+    if dry_run:
+        _line(Text("Dry run: no files were changed. Re-run without --dry-run to apply.",
+                   style="bold"))
+        return
+
+    if backup_path:
+        _line(Text(f"Original saved to {backup_path}", style="dim"))
+
+    if before is not None and after is not None:
+        removed = before - after
+        if removed > 0:
+            _line(Text(
+                f"Dockerfile findings: {before} -> {after} ({removed} resolved)",
+                style="bold green",
+            ))
+        elif removed == 0:
+            _line(Text(
+                f"Dockerfile findings: {before} -> {after} (no change - the edits "
+                f"did not resolve a reported finding)",
+                style="yellow",
+            ))
+        else:
+            _line(Text(
+                f"Dockerfile findings: {before} -> {after} (went up; review the "
+                f"diff above)",
+                style="bold red",
+            ))
+    _line(Text("Review the diff and run your build before committing.", style="dim"))
+
+
 def coverage(notes: Iterable[str], gaps: Iterable[str] = ()) -> None:
     """Render what the scan could not determine, and what it never examines.
 
