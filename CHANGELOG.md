@@ -4,12 +4,48 @@ All notable changes to DockSec are documented in this file.
 
 ## Unreleased
 
+### Fixed
+
+- **The container image and GitHub Action now work.** The image installed Trivy
+  from `raw.githubusercontent.com/aquasec/trivy/...`; the organization is
+  `aquasecurity`, so the URL returned 404. Because `curl -sfL ... | sh` exits 0
+  when the download fails, the build succeeded and produced an image with no
+  Trivy in it, and every Action run failed with "Missing required tools: trivy".
+  Trivy and Hadolint are now installed from version-pinned release artifacts
+  with `curl -f`, and the build asserts both binaries run before the image is
+  published. The Hadolint step had the same latent flaw (`curl -sL` without
+  `-f`, which would have written an HTTP error page to the binary path).
+- The Action failed with a `ValueError` traceback on any run that did not set
+  `llm_provider`, including `--scan-only` runs that need no provider at all.
+  `entrypoint.sh` exported every LLM variable unconditionally, and an empty
+  `LLM_PROVIDER` fails configuration validation. Only variables with a value
+  are exported now.
+- The image installed DockSec into `/github/workspace`, the directory the
+  Action mounts the repository into. This shipped DockSec's own source tree to
+  every user and left files that the bind mount then hid. The build now installs
+  from `/src` and leaves the workspace empty.
+
 ### Added
 
+- A `.dockerignore`, so local-only files are no longer copied into the published
+  image, and the build context stays small.
+- A container image smoke test workflow: it builds the image, asserts the
+  bundled tools run, asserts the workspace mount point is empty, runs a real
+  scan through the Action entrypoint, and checks that `--fail-on` still gates
+  the build. A build that succeeds while producing a non-functional image now
+  fails CI.
 - Markdown report format (`--format markdown`): a lightweight `.md` report with
   severity counts and a vulnerability table (including fixed versions) that
   renders natively in pull request comments and CI/CD job summaries. Opt-in, so
   the default report output is unchanged.
+
+### Changed
+
+- The container image now installs the `[ai]` extra. The Action exposes AI
+  analysis inputs, but the image installed the scan-only core, so those inputs
+  could never work.
+- Trivy is pinned to 0.74.0 and Hadolint to 2.15.1 in the image, so scan results
+  no longer change because of an upstream release.
 
 ## 2026.8.19
 

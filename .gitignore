@@ -195,6 +195,8 @@ CURSOR_CONFIGURATION.md
 
 # Internal/maintainer documentation (not for public repository)
 docs/promptfoo-benchmark-review.md
+docs/docksec-strategy-2026.md
+docs/cve-lite-cli-comparison.md
 ROADMAP.md
 
 # Claude Code project instructions (local only, not for public repository)
