@@ -10,7 +10,7 @@ from pathlib import Path
 from docksec import output as ui  # aliased; a local var named `output` is used below
 from docksec.config import RESULTS_DIR
 from docksec.enums import Severity
-from docksec.utils import ScoreResponse, get_llm, print_section, get_custom_logger
+from docksec.utils import print_section, get_custom_logger
 from collections import defaultdict
 
 # Initialize logger
@@ -295,25 +295,13 @@ class DockerSecurityScanner:
         self.offline = offline
         self.analysis_score = None  # Initialize to avoid AttributeError when accessed before calculation
         
-        # Initialize score chain: skip if scan_only or skip_ai_scoring flags are set
-        if scan_only or skip_ai_scoring:
-            self.score_chain = None
-        else:
-            try:
-                from docksec.enums import LLMProvider
-                from docksec.config_manager import get_config
-                from docksec.config import docker_score_prompt
-                config = get_config()
-                provider = config.llm_provider
-                llm = get_llm()
-                
-                if provider == LLMProvider.OPENAI:
-                    self.score_chain = docker_score_prompt | llm.with_structured_output(ScoreResponse, method="json_mode")
-                else:
-                    self.score_chain = docker_score_prompt | llm.with_structured_output(ScoreResponse)
-            except Exception as e:
-                logger.warning(f"Failed to initialize AI scoring: {e}")
-                self.score_chain = None
+        # Scoring is deterministic. It used to ask a model to "Score Docker
+        # security 1-100" from a count summary, which meant two runs over
+        # identical inputs could disagree - indefensible for a number a CI gate
+        # and a compliance report both depend on. The model's budget is spent on
+        # correlation instead, where non-determinism is acceptable and the
+        # output is genuinely something rules cannot produce.
+        self.score_chain = None
         
         # Ensure results directory exists
         try:
@@ -1008,12 +996,11 @@ class DockerSecurityScanner:
 
     def get_security_score(self, results: Dict) -> float:
         """
-        Calculate the security score based on scan results.
+        Calculate the security score from scan results.
 
-        Uses LLM-based scoring when available. Falls back to local static
-        scoring when scan_only=True or if the LLM call fails (e.g., quota exceeded).
-        
-        Optimizes token usage by sending summarized vulnerability data to LLM.
+        Deterministic: identical inputs always produce an identical score. CI
+        gates and compliance reports both depend on this number, so a score that
+        could vary between runs over the same image was not defensible.
 
         Args:
             results: The scan results to calculate the score from
@@ -1021,23 +1008,9 @@ class DockerSecurityScanner:
         Returns:
             The calculated security score
         """
-        if self.score_chain is None:
-            return self._calculate_local_score(results)
+        return self._calculate_local_score(results)
 
-        try:
-            from docksec.config import summarize_vulnerabilities
-            
-            # Create summarized vulnerability data instead of sending full results
-            vulnerabilities = results.get('json_data', [])
-            vuln_summary = summarize_vulnerabilities(vulnerabilities, max_count=20)
-            
-            # Send only summary, not full results dict
-            score = self.score_chain.invoke({"results": vuln_summary})
-            return score.score
-        except Exception as e:
-            logger.warning(f"AI scoring failed: {e}. Falling back to local scoring.")
-            return self._calculate_local_score(results)
-    
+
 def main():
     """Main function to run the security scanner."""
     if len(sys.argv) < 3:
