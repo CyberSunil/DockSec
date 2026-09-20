@@ -48,7 +48,8 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  # No IMAGE_NAME here: github.repository keeps the repository's casing, and
+  # GHCR paths must be lowercase. It is derived per-run in the job below.
 
 jobs:
   publish:
@@ -68,6 +69,16 @@ jobs:
           # Empty for a tag push or manual dispatch, where the default ref is
           # already correct.
           ref: ${{ inputs.ref || '' }}
+
+      # GHCR repository paths must be lowercase, but `github.repository` keeps
+      # the repository's own casing - here OWASP/DockSec. docker/metadata-action
+      # lowercases for us, so the image pushed fine, but actions/attest does not
+      # and tried to write the provenance to ghcr.io/OWASP/DockSec. The registry
+      # rejects that path outright (a token request for it returns 400), which
+      # surfaced as a 403 on the blob upload.
+      - name: Derive the lowercase image name
+        id: image
+        run: echo "name=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
@@ -90,7 +101,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -174,7 +185,7 @@ jobs:
       - name: Attest build provenance
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-name: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
@@ -194,6 +205,6 @@ jobs:
             echo '```bash'
             echo 'docker run --rm -v "$PWD:/github/workspace" \'
             echo '  -e INPUT_DOCKERFILE=Dockerfile -e INPUT_SCAN_ONLY=true \'
-            echo "  ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+            echo "  ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:latest"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
