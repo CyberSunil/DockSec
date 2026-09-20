@@ -4,6 +4,61 @@ All notable changes to DockSec are documented in this file.
 
 ## Unreleased
 
+### Added (adoption)
+
+- **`docksec --fix`** applies the mechanical subset of the suggested Dockerfile
+  changes, re-scans, and reports the before/after finding counts. It adds a
+  non-root `USER` before `CMD`, inserts a placeholder `HEALTHCHECK`, adds
+  `--no-install-recommends` to `apt-get install`, and converts `ADD` to `COPY`
+  for local paths.
+
+  It is conservative by design. It will not choose a base image version, move a
+  secret, convert an `ADD` that fetches a URL or unpacks an archive, or edit a
+  compose file - each needs a judgement call, and an auto-fix that breaks a
+  build gets switched off. Those are listed under "Needs review" instead.
+
+  Safety: the original is kept as `.bak`, `--dry-run` prints a unified diff
+  without writing, and a file with uncommitted changes is refused unless
+  `--force` is given, so git is always able to undo the change.
+
+- **Self-scan in CI.** DockSec now scans its own Dockerfile on every push and
+  pull request, gated at `--fail-on high`, and asserts the bundled examples
+  still behave: the hardened one must produce no CRITICAL/HIGH findings and
+  score above 70, the insecure one must produce CRITICAL findings, exploit
+  chains, and score below 25. A rule that starts misfiring shows up against a
+  real file before a user reports it.
+
+- **Build provenance on PyPI releases.** Wheels and sdists now carry a Sigstore
+  attestation, so a consumer can verify the artifact was built by this workflow
+  from this repository rather than uploaded by hand:
+  `gh attestation verify docksec-X.Y.Z-py3-none-any.whl --repo OWASP/DockSec`.
+
+- **A pre-commit hook** (`.pre-commit-hooks.yaml`), with `docksec` gating on
+  CRITICAL and `docksec-strict` on HIGH. No compose hook ships: a compose scan
+  needs the service images present, which on a developer machine they usually
+  are not, so the hook would fail on clean input and get bypassed.
+
+- **CI integration guides** for [Jenkins](docs/ci/jenkins.md),
+  [GitLab](docs/ci/gitlab.md), [Azure Pipelines](docs/ci/azure-pipelines.md),
+  and [pre-commit](docs/ci/pre-commit.md), including the mistake common to all
+  of them: the step that publishes the report is skipped exactly when the gate
+  fires, unless it is marked to always run.
+
+- **An [evaluation guide](docs/evaluation-guide.md)**: a 15-minute assessment
+  that starts by running `trivy config` so a reviewer can see what DockSec adds
+  over the tool it wraps, and ends with a list of what DockSec does not do.
+
+### Fixed
+
+- DockSec's own Dockerfile was missing `--no-install-recommends`, which the new
+  self-scan caught. The root-user finding is waived in a committed
+  `.docksec-ignore.yml` with the reason recorded: the image backs the GitHub
+  Action and must write into a workspace mount whose ownership it cannot
+  predict.
+- `autofix.rescan` returned `0` rather than `None` when the re-scan could not
+  run, which would have rendered as "7 -> 0 (7 resolved)" and claimed a success
+  that did not happen. Found by a test written for it.
+
 ### Added (correlation and triage)
 
 - **The AI pass now analyses the scan, not just the file.** It previously

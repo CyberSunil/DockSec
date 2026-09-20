@@ -196,6 +196,9 @@ def main() -> None:
     parser.add_argument('--sarif', dest='sarif', action='store_true', help='Write a SARIF 2.1.0 report for GitHub Code Scanning and other SARIF-compatible tools')
     parser.add_argument('--sbom', dest='sbom', action='store_true', help='Write a CycloneDX SBOM (.cdx.json) of the scanned image for supply-chain tooling (requires an image)')
     parser.add_argument('--offline', dest='offline', action='store_true', default=None, help='Run without network access: use the local Trivy DB (no DB update) and skip AI analysis')
+    parser.add_argument('--fix', dest='fix', action='store_true', help='Apply the safe subset of the suggested Dockerfile changes, keep a .bak, and re-scan to show the delta. Refuses to run on a dirty git working tree unless --force is given.')
+    parser.add_argument('--dry-run', dest='dry_run', action='store_true', help='With --fix, print the diff without writing anything')
+    parser.add_argument('--force', dest='force', action='store_true', help='With --fix, apply changes even when the git working tree has uncommitted changes to the target file')
     parser.add_argument('--no-epss', dest='no_epss', action='store_true', default=None, help='Skip the EPSS exploitation-likelihood lookup and rank findings by severity alone (only CVE IDs are ever sent; implied by --offline)')
     parser.add_argument('--incomplete-policy', dest='incomplete_policy', choices=['warn', 'fail'], default='warn', help="What to do when a scanner could not run: 'warn' reports the gap and continues (default), 'fail' exits 3 so CI cannot pass on an incomplete scan")
     parser.add_argument('--no-redact', dest='no_redact', action='store_true', default=None, help='Do not mask secret-looking values before sending file content to the AI provider')
@@ -338,6 +341,22 @@ def main() -> None:
     # Validate argument combinations
     if args.update_baseline and not args.baseline:
         output.error("--update-baseline requires --baseline FILE")
+        sys.exit(2)
+
+    # --fix edits a Dockerfile in place, so it needs one. Compose changes alter
+    # runtime topology and are deliberately never applied automatically.
+    if args.fix:
+        if args.compose:
+            output.error(
+                "--fix applies Dockerfile changes; compose changes alter runtime "
+                "topology and are reported for you to apply yourself."
+            )
+            sys.exit(2)
+        if not args.dockerfile:
+            output.error("--fix requires a Dockerfile path")
+            sys.exit(2)
+    elif args.dry_run:
+        output.error("--dry-run applies to --fix; it has no effect on its own")
         sys.exit(2)
 
     if args.image_only and args.ai_only:
@@ -679,6 +698,13 @@ def main() -> None:
                 _render_scan_summary(output, args, scanner, results, report_paths,
                                      run_ai, run_compose_analysis)
 
+            # --fix runs last, after the user has seen what was found: the
+            # changes only make sense in the context of the findings above.
+            if args.fix:
+                fix_applied = _apply_autofix(output, args, results)
+                if fix_applied is False:
+                    scan_ok = False
+
             if failed_services:
                 total = results.get("total_services")
                 scope = (f"{len(failed_services)} of {total}"
@@ -741,6 +767,68 @@ def main() -> None:
 
     if gate_triggered:
         sys.exit(1)
+
+
+def _apply_autofix(output, args, results):
+    """Apply the safe subset of the fix plan to the Dockerfile.
+
+    Returns True on success, False when the run should be treated as failed, and
+    None when there was nothing to do. Refuses to edit a file with uncommitted
+    changes unless --force: git is the real undo, so the tool makes sure git is
+    in a position to help.
+    """
+    from docksec import autofix, remediation
+
+    dockerfile = args.dockerfile
+    findings = results.get("json_data") or []
+    plan = remediation.build_plan(findings, dockerfile)
+
+    applicable, needs_review = autofix.plan_edits(plan)
+    if not applicable:
+        output.section("Automatic fixes")
+        output.info("No automatically applicable changes for this Dockerfile.")
+        for edit in needs_review[:5]:
+            output.detail(f"  - {edit.get('instruction')} ({edit.get('reason')})")
+        return None
+
+    if not args.dry_run and not args.force:
+        dirty = autofix.working_tree_is_dirty(dockerfile)
+        if dirty:
+            output.error(
+                f"{dockerfile} has uncommitted changes. Commit or stash them "
+                f"first so the edits can be reviewed and reverted, or pass "
+                f"--force to edit anyway."
+            )
+            output.detail("  Preview the changes without writing: --fix --dry-run")
+            return False
+
+    output.section("Automatic fixes")
+    before = len(results.get("dockerfile_findings") or [])
+
+    try:
+        result = autofix.apply_to_dockerfile(
+            dockerfile, plan, dry_run=args.dry_run, backup=True
+        )
+    except OSError as exc:
+        output.error(f"Could not apply fixes to {dockerfile}: {exc}")
+        return False
+
+    if not result.applied:
+        output.info("Nothing to change: the applicable fixes are already in place.")
+        return None
+
+    if args.dry_run:
+        output.fix_diff(result.diff(os.path.basename(dockerfile)), result.applied,
+                        result.skipped, dry_run=True)
+        return True
+
+    result.findings_before = before
+    result.findings_after = autofix.rescan(dockerfile, offline=bool(args.offline))
+    output.fix_diff(result.diff(os.path.basename(dockerfile)), result.applied,
+                    result.skipped, dry_run=False,
+                    backup_path=result.backup_path,
+                    before=result.findings_before, after=result.findings_after)
+    return True
 
 
 def _load_compose_topology(compose_path):
