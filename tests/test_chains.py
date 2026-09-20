@@ -259,12 +259,43 @@ class TestRuleDocumentation(unittest.TestCase):
         source = Path("docksec/compose_scanner.py").read_text()
         return set(re.findall(r'"(compose-[a-z-]+)"', source))
 
+    def _tracked_pages(self):
+        """Rule pages as git sees them, not as the working tree does.
+
+        Checking the filesystem alone passed locally while CI failed: the page
+        for compose-latest-or-untagged-image existed on disk but was matched by
+        an unanchored `*TEST*.md` ignore rule ("latest" contains "test"), so it
+        was never committed. A doc-coverage guard that cannot see that is not
+        guarding much.
+        """
+        import subprocess
+
+        result = subprocess.run(
+            ["git", "ls-files", "docs/rules/compose-*.md"],
+            capture_output=True, text=True, check=False,
+        )
+        if result.returncode != 0:
+            self.skipTest("not a git checkout")
+        return {
+            line.rsplit("/", 1)[-1].removesuffix(".md")
+            for line in result.stdout.splitlines() if line.strip()
+        }
+
     def test_every_rule_has_a_page(self):
         from pathlib import Path
 
         documented = {p.stem for p in Path("docs/rules").glob("compose-*.md")}
         missing = self._rule_ids() - documented
         self.assertFalse(missing, f"rules with no documentation page: {sorted(missing)}")
+
+    def test_every_rule_page_is_committed(self):
+        """A page that exists only in the working tree ships to nobody."""
+        missing = self._rule_ids() - self._tracked_pages()
+        self.assertFalse(
+            missing,
+            f"rule pages exist on disk but are not tracked by git (check "
+            f".gitignore): {sorted(missing)}",
+        )
 
     def test_no_orphan_pages(self):
         """A page for a rule that no longer exists is worse than none: it
