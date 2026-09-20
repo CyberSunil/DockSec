@@ -58,7 +58,8 @@ class TestEntrypointForwardsArguments(unittest.TestCase):
         stub = os.path.join(self.bindir, "docksec")
         with open(stub, "w") as fh:
             fh.write('#!/bin/sh\nprintf "ARGS:"\nfor a in "$@"; do printf " %s" "$a"; done\nprintf "\\n"\n')
-        os.chmod(stub, 0o755)
+        # Owner-only: nothing but this test process ever executes the stub.
+        os.chmod(stub, 0o700)
 
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
