@@ -612,12 +612,30 @@ def main() -> None:
                 output.section("Advanced scan (Docker Scout)")
                 scanner.advanced_scan()
 
-            scan_ok = True
+            # A compose run whose services could not be scanned must not report
+            # success: the summary and score describe only the static rules, and
+            # exiting 0 would let CI pass on a scan that never inspected the
+            # images. Exit 3 (tool/runtime error) rather than 1, since this is a
+            # scan that did not complete, not a policy violation.
+            failed_services = _failed_service_names(results.get("failed_services"))
+            scan_ok = not failed_services
+
             if args.json_stdout:
                 _print_json_results(results, scanner, report_paths)
             else:
                 _render_scan_summary(output, args, scanner, results, report_paths,
                                      run_ai, run_compose_analysis)
+
+            if failed_services:
+                total = results.get("total_services")
+                scope = (f"{len(failed_services)} of {total}"
+                         if isinstance(total, int) and total > 0
+                         else f"{len(failed_services)}")
+                output.error(
+                    f"{scope} service(s) could not be scanned: "
+                    f"{', '.join(failed_services)}. Results cover the compose "
+                    f"file's static rules only."
+                )
 
             # --update-baseline: snapshot current findings and skip gating.
             if args.update_baseline:

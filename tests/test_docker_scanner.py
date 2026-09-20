@@ -89,17 +89,40 @@ class TestDockerSecurityScanner(unittest.TestCase):
                 DockerSecurityScanner._validate_image_name(name)
     
     def test_validate_file_path(self):
-        """Test file path validation."""
+        """Test file path validation.
+
+        Paths containing '..' are no longer rejected outright: the check blocked
+        the legitimate monorepo invocation `docksec ../service/Dockerfile` while
+        protecting nothing, since the path comes from the user's own command
+        line and is read with their own permissions. Validation now resolves the
+        path and rejects what cannot be scanned.
+        """
         from docksec.docker_scanner import DockerSecurityScanner
-        
-        # Path traversal attempts should be rejected
+
+        # Empty paths are rejected
         with self.assertRaises(ValueError):
-            DockerSecurityScanner._validate_file_path("../../../etc/passwd")
-        
+            DockerSecurityScanner._validate_file_path("")
+
+        # A directory is not a Dockerfile
+        with self.assertRaises(ValueError):
+            DockerSecurityScanner._validate_file_path(self.test_dir)
+
         # Valid path should work
         dockerfile = self.create_test_dockerfile()
         result = DockerSecurityScanner._validate_file_path(dockerfile)
         self.assertTrue(result.exists())
+
+        # A relative path that traverses upward is valid input
+        parent_relative = os.path.join(
+            "..", os.path.basename(self.test_dir), "Dockerfile"
+        )
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(self.test_dir)
+            resolved = DockerSecurityScanner._validate_file_path(parent_relative)
+            self.assertEqual(resolved, Path(dockerfile).resolve())
+        finally:
+            os.chdir(original_cwd)
     
     def test_validate_severity(self):
         """Test severity validation."""
