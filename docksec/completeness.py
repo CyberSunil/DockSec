@@ -17,10 +17,47 @@ regardless of whether anything failed, so an evaluator is not left inferring
 scope from silence.
 """
 
+import re
+import subprocess
 from typing import Dict, List, Optional
 
 DETECTION = "detection"
 REMEDIATION = "remediation"
+
+# Cached for the process: these shell out, and the versions cannot change
+# mid-run.
+_TOOL_VERSIONS: Optional[Dict[str, str]] = None
+
+
+def _tool_version(tool: str) -> Optional[str]:
+    """Return a scanner's version string, or None if it cannot be determined."""
+    try:
+        proc = subprocess.run(
+            [tool, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            shell=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    match = re.search(r"(\d+\.\d+(?:\.\d+)?)", proc.stdout or "")
+    return match.group(1) if match else None
+
+
+def tool_versions() -> Dict[str, str]:
+    """The scanner versions this run used, for the coverage block."""
+    global _TOOL_VERSIONS
+    if _TOOL_VERSIONS is None:
+        found = {}
+        for tool in ("trivy", "hadolint"):
+            version = _tool_version(tool)
+            if version:
+                found[tool] = version
+        _TOOL_VERSIONS = found
+    return _TOOL_VERSIONS
 
 
 class ScanCompleteness:
@@ -100,6 +137,21 @@ def coverage_notes(results: Dict, ai_ran: bool = False) -> List[str]:
         )
 
     notes.append("Secrets committed elsewhere in the build context are not scanned.")
+
+    # Results depend on the scanner versions, and the published image pins
+    # versions a local install does not. Stating them turns "CI found one more
+    # finding than my laptop" from a suspected bug into a visible difference.
+    # An explicit (even empty) mapping in results wins; detection is only the
+    # fallback for callers that do not record versions themselves.
+    versions = results.get("tool_versions")
+    if versions is None:
+        versions = tool_versions()
+    reported = [f"{name} {version}" for name, version in sorted(versions.items()) if version]
+    if reported:
+        notes.append(
+            f"Findings depend on scanner versions: {', '.join(reported)}. "
+            f"A different version may report a different set."
+        )
     return notes
 
 

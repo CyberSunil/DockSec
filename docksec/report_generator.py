@@ -281,6 +281,27 @@ class ReportGenerator:
         }
         return mapping.get(str(severity or "UNKNOWN").upper(), "note")
 
+    # GitHub reads `security-severity` to decide how to surface a finding. When
+    # a finding has no CVSS score - true of every Hadolint and `trivy config`
+    # rule, and of many CVEs - an empty string means GitHub falls back to its
+    # own default instead of the severity DockSec assigned. These are the
+    # midpoints of the CVSS v3 qualitative bands, used only as a fallback.
+    _SEVERITY_SCORES = {
+        "CRITICAL": "9.0",
+        "HIGH": "7.0",
+        "MEDIUM": "5.0",
+        "LOW": "3.0",
+    }
+
+    @staticmethod
+    def _sarif_security_severity(vuln: Dict) -> str:
+        """The numeric score GitHub ranks by, falling back to severity."""
+        cvss = str(vuln.get("CVSS") or "").strip()
+        if cvss:
+            return cvss
+        severity = str(vuln.get("Severity") or "").upper()
+        return ReportGenerator._SEVERITY_SCORES.get(severity, "")
+
     @staticmethod
     def _sarif_rule(rule_id: str, vuln: Dict) -> Dict:
         """Build the SARIF rule (reportingDescriptor) for one finding type."""
@@ -290,7 +311,7 @@ class ReportGenerator:
             "shortDescription": {"text": vuln.get("Title") or rule_id},
             "fullDescription": {"text": vuln.get("Description") or vuln.get("Title") or rule_id},
             "defaultConfiguration": {"level": ReportGenerator._sarif_level(vuln.get("Severity"))},
-            "properties": {"security-severity": str(vuln.get("CVSS") or "")},
+            "properties": {"security-severity": ReportGenerator._sarif_security_severity(vuln)},
         }
         primary_url = vuln.get("PrimaryURL")
         if primary_url:
@@ -315,12 +336,30 @@ class ReportGenerator:
         if region:
             location["physicalLocation"]["region"] = region
 
-        return {
+        result = {
             "ruleId": rule_id,
             "level": ReportGenerator._sarif_level(vuln.get("Severity")),
             "message": {"text": message},
             "locations": [location],
         }
+
+        # Carry the EPSS signal into SARIF. Without it, Code Scanning users -
+        # the largest integration surface - lose the exploitation data that
+        # drives DockSec's own ordering.
+        properties = {}
+        epss = vuln.get("EPSS")
+        if epss is not None:
+            properties["epss"] = epss
+        percentile = vuln.get("EPSSPercentile")
+        if percentile is not None:
+            properties["epssPercentile"] = percentile
+        priority = vuln.get("Priority")
+        if priority:
+            properties["priority"] = priority
+        if properties:
+            result["properties"] = properties
+
+        return result
 
     @staticmethod
     def _sarif_region(target, line=None) -> Optional[Dict]:

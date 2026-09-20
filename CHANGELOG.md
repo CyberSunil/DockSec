@@ -50,6 +50,44 @@ All notable changes to DockSec are documented in this file.
 
 ### Fixed
 
+- **The container image ignored every command-line argument.** `entrypoint.sh`
+  built its argument list only from the Action's `INPUT_*` variables and never
+  forwarded `"$@"`, so `docker run ghcr.io/owasp/docksec:latest --version` and
+  `--help` - the first two commands anyone runs against an unfamiliar image -
+  both failed with "Dockerfile path is required". The Action path was
+  unaffected. Command-line arguments are now appended after the `INPUT_*`
+  handling, so both forms work and can be combined.
+
+- **Fix commands ignored the EPSS priority DockSec had just computed.** The
+  output printed a `Fix Now` / `Fix Soon` breakdown and then ordered the
+  commands by severity and package name, so on a Postgres image the three
+  genuinely-exploited OpenSSL CVEs sat alphabetically among 160+ lower-priority
+  entries with nothing marking them. Commands are now ordered by priority tier
+  first, each row is labelled with its tier, and where several CVEs share a
+  package the one driving the tier is kept in the displayed IDs.
+
+- **SARIF reported no severity for findings without a CVSS score.** The
+  `security-severity` property was set to `str(CVSS or "")`, which is an empty
+  string for every Hadolint and `trivy config` rule and for many CVEs - 14 of 25
+  rules on an nginx scan. GitHub Code Scanning ranks by that property, so those
+  findings did not surface at the severity DockSec assigned. It now falls back
+  to the severity band when no CVSS score is available.
+
+- **SARIF carried no EPSS data.** Code Scanning users, the largest integration
+  surface, saw none of the exploitation signal driving DockSec's own ordering.
+  Results now carry `epss`, `epssPercentile` and `priority` properties.
+
+- **Compose scans never pulled images.** A service whose image was not already
+  local failed with "not found locally", so on a clean machine or a fresh CI
+  runner the insecure compose example reported both services unscanned and
+  scored from static rules alone. Missing images are now pulled on demand. This
+  never happens under `--offline`, and can be disabled with
+  `DOCKSEC_PULL_MISSING_IMAGES=false`.
+
+- Coverage notes now state the Trivy and Hadolint versions used. The published
+  image pins versions a local install does not, so the same Dockerfile could
+  yield 9 findings locally and 11 in CI with nothing explaining the difference.
+
 - DockSec's own Dockerfile was missing `--no-install-recommends`, which the new
   self-scan caught. The root-user finding is waived in a committed
   `.docksec-ignore.yml` with the reason recorded: the image backs the GitHub
