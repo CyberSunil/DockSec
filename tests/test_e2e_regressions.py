@@ -7,7 +7,6 @@ test reaches DockSec either through `--entrypoint sh` or the INPUT_* variables,
 so a shell script that dropped every command-line argument passed green.
 """
 
-import json
 import os
 import shutil
 import subprocess
