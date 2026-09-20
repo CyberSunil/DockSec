@@ -1,0 +1,23 @@
+# Go service on a distroless runtime: no shell, no package manager, and nothing
+# for an attacker to pivot with after a compromise. The nearest thing to a
+# minimal container this tool can demonstrate.
+FROM golang:1.23.3-alpine@sha256:c694a4d291a13a9f9d94933395673494fc2cc9d4777b85df3a7e70b3492d3574 AS build
+
+WORKDIR /src
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+# Static binary: distroless carries no libc to link against at runtime.
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/server ./cmd/server
+
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:d71f4b239be2d412017b798a0a401c44c3049a3ca454838473a4c32ed076bfea
+
+COPY --from=build /out/server /server
+
+USER nonroot:nonroot
+
+EXPOSE 8080
+
+ENTRYPOINT ["/server"]

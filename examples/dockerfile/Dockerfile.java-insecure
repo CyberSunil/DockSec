@@ -1,0 +1,16 @@
+# Java service built and run in a full JDK image: a large attack surface, a
+# compiler shipped to production, and the build context copied in wholesale.
+FROM openjdk:17
+
+WORKDIR /opt/app
+
+ENV KEYSTORE_PASSWORD=changeit123
+ENV SPRING_DATASOURCE_PASSWORD=admin
+
+RUN apt-get update && apt-get install -y maven curl
+
+COPY . .
+RUN mvn package -DskipTests
+
+EXPOSE 8080
+CMD ["java", "-jar", "target/app.jar"]
