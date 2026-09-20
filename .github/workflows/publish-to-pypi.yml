@@ -154,6 +154,24 @@ jobs:
       with:
         password: ${{ secrets.PYPI_API_TOKEN }}
 
+  # Called explicitly rather than left to the `push: tags` trigger on that
+  # workflow. A tag pushed with GITHUB_TOKEN does not start further workflows,
+  # so relying on the trigger meant the v2026.9.20rc1 release finished green
+  # with no image published and no failure to point at it.
+  publish-image:
+    needs: [update-version, publish-pypi]
+    uses: ./.github/workflows/publish-container-image.yml
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    with:
+      ref: v${{ needs.update-version.outputs.version }}
+      image_tag: ${{ needs.update-version.outputs.version }}
+      # A pre-release publishes its own version tag but must not move :latest.
+      publish_latest: ${{ !contains(needs.update-version.outputs.version, 'rc') && !contains(needs.update-version.outputs.version, '-') }}
+
   publish-github-release:
     needs: [update-version, publish-pypi]
     runs-on: ubuntu-latest
