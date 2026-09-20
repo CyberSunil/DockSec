@@ -1,0 +1,92 @@
+.section {
+  margin-bottom: var(--ds-space-xl);
+}
+
+.blurb {
+  color: var(--ds-text-muted);
+  margin-bottom: var(--ds-space-lg);
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--ds-space-md);
+}
+
+.item {
+  border: 1px solid var(--ds-border);
+  border-left: 3px solid var(--ifm-color-primary);
+  border-radius: var(--ds-radius);
+  padding: var(--ds-space-md);
+  background: var(--ds-surface-raised);
+}
+
+.meta {
+  display: flex;
+  gap: var(--ds-space-sm);
+  align-items: baseline;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: var(--ds-text-muted);
+  margin-bottom: var(--ds-space-xs);
+}
+
+.outlet {
+  font-weight: 700;
+  color: var(--ifm-color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0 0 var(--ds-space-xs);
+  line-height: 1.35;
+}
+
+.quote {
+  border-left: 2px solid var(--ds-border);
+  margin: var(--ds-space-sm) 0;
+  padding-left: var(--ds-space-md);
+  font-style: italic;
+  color: var(--ds-text-muted);
+}
+
+.summary {
+  margin: var(--ds-space-sm) 0 0;
+  color: var(--ds-text-muted);
+  font-size: 0.93rem;
+  line-height: 1.6;
+}
+
+/* Shown while a section has no entries yet, so the page is still useful and
+   an editor knows exactly where to add one. */
+.empty {
+  border: 1px dashed var(--ds-border);
+  border-radius: var(--ds-radius);
+  padding: var(--ds-space-lg);
+  text-align: center;
+  color: var(--ds-text-muted);
+  font-size: 0.93rem;
+}
+
+/* Featured entries get a stronger rule, so the handful worth reading first
+   are findable in a long list. */
+.featured {
+  border-left-width: 5px;
+  background: var(--ds-surface);
+}
+
+.tag {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--ds-border);
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+  color: var(--ds-text-muted);
+}
