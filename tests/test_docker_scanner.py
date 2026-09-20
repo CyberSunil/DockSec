@@ -34,14 +34,10 @@ class TestDockerSecurityScanner(unittest.TestCase):
         return self.test_dockerfile
     
     @patch('docksec.docker_scanner.subprocess.run')
-    @patch('docksec.docker_scanner.get_llm')
-    def test_init_with_valid_inputs(self, mock_llm, mock_subprocess):
+    def test_init_with_valid_inputs(self, mock_subprocess):
         """Test initialization with valid inputs."""
         # Mock subprocess calls for tool checking and docker image inspect
         mock_subprocess.return_value = Mock(returncode=0, stdout="", stderr="")
-        
-        # Mock LLM
-        mock_llm.return_value = Mock()
         
         dockerfile = self.create_test_dockerfile()
         
@@ -153,7 +149,7 @@ class TestDockerSecurityScanner(unittest.TestCase):
         
         self.create_test_dockerfile()
         
-        with patch('docksec.docker_scanner.get_llm'):
+        if True:  # get_llm is no longer imported in docker_scanner (scoring is deterministic)
             scanner = DockerSecurityScanner.__new__(DockerSecurityScanner)
             scanner.required_tools = ['docker', 'trivy']
             missing = scanner._check_tools()
@@ -397,25 +393,41 @@ class TestDockerSecurityScanner(unittest.TestCase):
             shutil.rmtree(temp_dir)
     
     @patch('docksec.docker_scanner.subprocess.run')
-    @patch('docksec.docker_scanner.get_llm')
-    def test_init_with_skip_ai_scoring_flag(self, mock_llm, mock_subprocess):
-        """Test initialization with skip_ai_scoring flag."""
+    def test_scoring_is_always_deterministic(self, mock_subprocess):
+        """Scoring never calls a model, whatever skip_ai_scoring says.
+
+        Asking a model to "Score Docker security 1-100" meant two runs over
+        identical inputs could disagree, which is indefensible for a number a CI
+        gate and a compliance report both depend on.
+        """
         mock_subprocess.return_value = Mock(returncode=0, stdout="", stderr="")
-        
         dockerfile = self.create_test_dockerfile()
-        
+
         from docksec.docker_scanner import DockerSecurityScanner
-        
-        # With skip_ai_scoring=True, score_chain should be None
-        scanner = DockerSecurityScanner(dockerfile, "test:latest", skip_ai_scoring=True)
-        self.assertIsNone(scanner.score_chain)
-        
-        # With skip_ai_scoring=False, score_chain should be initialized
-        mock_llm.return_value = Mock()
-        scanner2 = DockerSecurityScanner(dockerfile, "test:latest", skip_ai_scoring=False)
-        # Score chain is initialized if get_llm doesn't raise
-        if mock_llm.call_count > 1:  # Called again for this scanner
-            self.assertIsNotNone(scanner2.score_chain)
+
+        for skip in (True, False):
+            with self.subTest(skip_ai_scoring=skip):
+                scanner = DockerSecurityScanner(
+                    dockerfile, "test:latest", skip_ai_scoring=skip
+                )
+                self.assertIsNone(scanner.score_chain)
+
+    @patch('docksec.docker_scanner.subprocess.run')
+    def test_identical_inputs_produce_identical_scores(self, mock_subprocess):
+        mock_subprocess.return_value = Mock(returncode=0, stdout="", stderr="")
+        dockerfile = self.create_test_dockerfile()
+
+        from docksec.docker_scanner import DockerSecurityScanner
+
+        results = {
+            "dockerfile_scan": {"success": False, "output": "x", "skipped": False},
+            "image_scan": {"success": True, "output": "", "skipped": False},
+            "json_data": [{"VulnerabilityID": "CVE-1", "Severity": "HIGH"}],
+            "dockerfile_path": dockerfile,
+        }
+        scanner = DockerSecurityScanner(dockerfile, "test:latest")
+        scores = {scanner.get_security_score(results) for _ in range(5)}
+        self.assertEqual(len(scores), 1, f"score varied across runs: {scores}")
 
     @patch('docksec.docker_scanner.subprocess.run')
     def test_scan_image_json_success(self, mock_run):

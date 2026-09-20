@@ -48,17 +48,21 @@ Everything scans locally; the only thing that ever leaves your machine is the (s
   <p><em>DockSec workflow: from scanning to actionable insights</em></p>
 </div>
 
-DockSec follows a four-stage pipeline:
+DockSec follows a five-stage pipeline:
 
 1. **Scan**: Runs Trivy (image vulnerabilities and Dockerfile misconfigurations),
    Hadolint, and Docker Scout locally on your environment.
 2. **Prioritize**: Ranks every CVE finding by severity combined with its
    [EPSS](https://www.first.org/epss/) exploitation likelihood, so the list is
    ordered by what to fix first rather than by what was found first.
-3. **Recommend**: Produces copy-and-run fix commands and concrete Dockerfile or
-   compose changes, and states how many findings they resolve. With an API key,
-   an AI pass adds plain-English explanations.
-4. **Report**: Exports actionable results as HTML, PDF, JSON, CSV, Markdown, SARIF, and CycloneDX SBOM.
+3. **Correlate**: Detects [exploit chains](docs/exploit-chains.md) where separate
+   findings combine into one attack path - a credentialed database that an
+   internet-facing service can reach is a chain, not two unrelated findings.
+   With an API key, an AI pass reasons over the full scan output to rank, explain,
+   and extend this.
+4. **Recommend**: Produces copy-and-run fix commands and concrete Dockerfile or
+   compose changes, and states how many findings they resolve.
+5. **Report**: Exports actionable results as HTML, PDF, JSON, CSV, Markdown, SARIF, and CycloneDX SBOM.
 
 ---
 
@@ -379,6 +383,32 @@ This is the only network call DockSec makes outside the AI pass, and it is
 deliberately narrow: **only CVE IDs are sent** - no image names, no file contents,
 no paths. Scores are cached for 24 hours. `--offline` and `--no-epss` disable it,
 and any failure falls back to severity-only ranking rather than failing the scan.
+
+### Exploit chains
+
+A per-service view reports findings one at a time. DockSec also reports where
+separate findings combine into a single attack path:
+
+```text
+Exploit chains
+  [HIGH] 'web' is internet-facing and can reach 'db' with a committed credential
+      services: web, db
+      combines: compose-plaintext-secret-env, compose-no-network-segmentation
+      'web' accepts connections from outside the host and shares the default
+      network with 'db'. 'db' is not exposed directly, but its credential is in
+      the compose file, so compromising 'web' yields authenticated access to it.
+      Neither service looks critical on its own.
+      break it: Put 'db' on its own network that 'web' does not join, or move
+      POSTGRES_PASSWORD to a Docker secret.
+```
+
+Chain detection is rule-based, so it works with `--scan-only`, offline, and with
+no API key, and returns the same answer every run. The AI pass ranks and extends
+it rather than being required for it. Chains also appear in `--json` under
+`exploit_chains`.
+
+See the [exploit chains guide](docs/exploit-chains.md) for the full list and the
+[compose rule reference](docs/rules/README.md) for every rule they combine.
 
 ### Fix commands
 

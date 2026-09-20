@@ -4,6 +4,72 @@ All notable changes to DockSec are documented in this file.
 
 ## Unreleased
 
+### Added (correlation and triage)
+
+- **The AI pass now analyses the scan, not just the file.** It previously
+  received the Dockerfile text and nothing else - no CVEs, no lint findings, no
+  topology - so it could not do the one thing the README claimed. The prompt was
+  ten lines and returned five lists of free-text strings.
+
+  The correlation pass now runs after the scan and receives the CVE list with
+  fixed versions and EPSS tiers, the Dockerfile misconfigurations with line
+  numbers, and the compose service topology. It returns typed findings
+  (`finding_id`, `line`, `severity`, `why_it_matters`, `fix`, `confidence`) and
+  exploit chains, so AI output can be sorted, anchored to a line, and rendered
+  alongside scanner findings rather than as a wall of prose.
+
+- **Cross-service exploit chains.** A credentialed database is one finding; a
+  database that also publishes a port, or that an internet-facing service can
+  reach over a shared network, is a single exploitable path. DockSec now reports
+  those paths: the services involved, the findings that combine, the attack path
+  in order, and the one change that breaks it.
+
+  Detection is rule-based - a graph query over the compose topology - so it
+  works with `--scan-only`, offline, and with no API key, and returns the same
+  answer every run. The AI pass ranks and extends chains; it is not required to
+  find them. Three chain types ship: exposed credentialed datastore, exposed
+  escape path, and lateral movement to a datastore. Exposed in `--json` under
+  `exploit_chains`. See `docs/exploit-chains.md`.
+
+- **Prompt versioning and injection hardening.** The prompt carries a version
+  that is recorded on the analysis, so a change in output can be attributed to a
+  prompt revision rather than mistaken for model drift. File content is fenced,
+  labelled as untrusted data, and kept in a separate message role from the
+  instructions, and the system prompt tells the model never to follow
+  instructions found inside it - a Dockerfile is attacker-controlled input when
+  scanning an untrusted repository.
+
+- **A documentation page for every compose rule** (`docs/rules/`), each with
+  what it catches, an example, why it matters, how to fix it, and when keeping
+  the pattern is legitimate. Previously the 17 rules existed only as strings in
+  a Python file, which gave a reviewer no way to judge whether a finding was
+  real. A test asserts no rule lacks a page and no page outlives its rule.
+
+### Changed
+
+- **Scoring is deterministic and no longer calls a model.** It previously asked
+  an LLM to "Score Docker security 1-100" from a count summary, so two runs over
+  identical inputs could disagree - indefensible for a number a CI gate and a
+  compliance report both depend on. The model's budget is spent on correlation
+  instead, where non-determinism is acceptable and the output is something rules
+  cannot produce.
+- `--skip-ai-scoring` is deprecated. It now warns and does nothing, and will be
+  removed in a future release. Silently ignoring a flag someone has in a CI
+  config is worse than either honouring it or erroring.
+- **`--ai-only` now runs the local Dockerfile scan.** Correlation needs
+  something to correlate, and the Dockerfile scan is local and fast. The flag
+  now means "do not scan an image": no registry pull, no Trivy image scan, no
+  Docker Scout.
+
+### Fixed
+
+- A Dockerfile-only run (`docksec Dockerfile`, no `-i`) performed no scan at
+  all, because the scan pass required an image. Dockerfile findings have been
+  structured since the previous release, so there is now something to scan.
+- Removed the separate AI-only report path. It existed because the AI pass ran
+  without a scan and so produced no report; the correlation pass now runs inside
+  the scan block, which already writes reports containing the AI findings.
+
 ### Added (findings, priority, and fixes)
 
 - **Dockerfile findings are now first-class.** Hadolint output was a text blob:

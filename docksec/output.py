@@ -308,6 +308,73 @@ def fix_plan(plan) -> None:
         _line(Text(claim, style="bold"))
 
 
+_CONFIDENCE_STYLES = {"high": "green", "medium": "yellow", "low": "dim"}
+
+
+def ai_analysis(analysis: Dict) -> None:
+    """Render the AI correlation pass.
+
+    Exploit chains come first and are the most prominent thing on screen: they
+    are the output no per-artifact scanner can produce, and the reason the
+    correlation pass exists.
+    """
+    if is_quiet() or not analysis:
+        return
+
+    console = get_console()
+    summary = analysis.get("summary")
+    chains = analysis.get("chains") or []
+    findings = analysis.get("findings") or []
+
+    if summary:
+        console.print()
+        _line(Text(summary, style="bold"))
+
+    if chains:
+        console.print()
+        _line(Text("Exploit chains", style="bold red"))
+        for chain in chains:
+            severity = str(chain.get("severity", "")).upper()
+            _line(
+                Text.assemble(
+                    ("  ", "default"),
+                    (f"[{severity}] ", "red"),
+                    (chain.get("title", ""), "bold"),
+                )
+            )
+            services = chain.get("services") or []
+            if services:
+                _line(Text(f"      services: {', '.join(services)}", style="dim"))
+            ids = chain.get("finding_ids") or []
+            if ids:
+                _line(Text(f"      combines: {', '.join(ids)}", style="dim"))
+            if chain.get("narrative"):
+                _line(Text(f"      {chain['narrative']}", style="default"))
+            if chain.get("fix"):
+                _line(Text.assemble(("      break it: ", "dim"), (chain["fix"], "green")))
+
+    if findings:
+        console.print()
+        _line(Text("AI analysis", style="bold cyan"))
+        for finding in findings:
+            severity = str(finding.get("severity", "")).upper()
+            confidence = str(finding.get("confidence", "")).lower()
+            location = f" (line {finding['line']})" if finding.get("line") else ""
+            _line(
+                Text.assemble(
+                    ("  - ", "cyan"),
+                    (f"[{severity}] ", "default"),
+                    (finding.get("title", ""), "bold"),
+                    (location, "dim"),
+                    (f"  {confidence} confidence", _CONFIDENCE_STYLES.get(confidence, "dim")),
+                )
+            )
+            if finding.get("why_it_matters"):
+                _line(Text(f"      {finding['why_it_matters']}", style="default"))
+            if finding.get("fix"):
+                _line(Text.assemble(("      fix: ", "dim"), (finding["fix"], "green")))
+
+
 def coverage(notes: Iterable[str], gaps: Iterable[str] = ()) -> None:
     """Render what the scan could not determine, and what it never examines.
 
