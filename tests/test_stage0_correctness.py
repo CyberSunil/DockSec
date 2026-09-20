@@ -40,17 +40,40 @@ class TestComposeScanFailuresAreFatal(unittest.TestCase):
 
     def test_orchestrator_records_failures_for_missing_images(self):
         """The orchestrator must populate failed_services; the CLI's exit code
-        depends on it."""
+        depends on it.
+
+        Pulling is disabled here so the test stays hermetic and offline: the
+        scanner now fetches missing images by default, which would otherwise
+        turn this into a multi-gigabyte network test.
+
+        The compose file names images that cannot resolve, rather than relying
+        on the runner happening not to have nginx and postgres cached - which
+        is what made this test pass on CI and fail on a developer machine.
+        """
+        import os
+        import tempfile
+        from unittest import mock
+
         from docksec.compose_scanner import ComposeOrchestrator
 
-        orchestrator = ComposeOrchestrator(
-            "examples/compose/docker-compose-insecure.yml",
-            scan_only=True,
-            skip_ai_scoring=True,
+        compose = (
+            "services:\n"
+            "  web:\n"
+            "    image: docksec.invalid/definitely-not-a-real-image:notatag\n"
+            "  db:\n"
+            "    image: docksec.invalid/also-not-real:notatag\n"
         )
-        results = orchestrator.run_full_scan("CRITICAL,HIGH")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "docker-compose.yml")
+            with open(path, "w") as fh:
+                fh.write(compose)
 
-        # Images are not pulled in the test environment, so both services fail.
+            with mock.patch.dict(os.environ, {"DOCKSEC_PULL_MISSING_IMAGES": "false"}):
+                orchestrator = ComposeOrchestrator(
+                    path, scan_only=True, skip_ai_scoring=True,
+                )
+                results = orchestrator.run_full_scan("CRITICAL,HIGH")
+
         self.assertTrue(
             results.get("failed_services"),
             "failed services must be recorded so the CLI can exit non-zero",

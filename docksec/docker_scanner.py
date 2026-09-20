@@ -317,6 +317,14 @@ class DockerSecurityScanner:
         self.cache = ScanResultsCache(self.RESULTS_DIR)
         self.use_cache = os.getenv("DOCKSEC_USE_CACHE", "true").lower() == "true"
 
+        # A compose stack routinely names images the user has never pulled, and
+        # refusing to fetch them reports every service as unscanned. Pulling is
+        # a network operation that can move gigabytes, so it stays switchable
+        # and is never attempted under --offline.
+        self.pull_missing_images = (
+            os.getenv("DOCKSEC_PULL_MISSING_IMAGES", "true").lower() == "true"
+        )
+
         # Verify required tools
         missing_tools = self._check_tools()
         if missing_tools:
@@ -353,8 +361,26 @@ class DockerSecurityScanner:
                         f"  3. If you must use sudo, run DockSec with sudo (not recommended for security reasons)\n"
                         f"Original error: {e.stderr.strip() if e.stderr else str(e)}"
                     )
-                # If it's not a permission error, assume the image doesn't exist
-                raise ValueError(f"Docker image '{self.image_name}' not found locally")
+                # Not a permission problem, so the image is simply not present
+                # locally. A compose stack routinely names images the user has
+                # never pulled, and refusing there reports every service as
+                # unscanned on an otherwise healthy machine. Pull it once, then
+                # let a second failure stand.
+                if self.offline or not self.pull_missing_images:
+                    reason = (
+                        "--offline forbids pulling it"
+                        if self.offline
+                        else "DOCKSEC_PULL_MISSING_IMAGES=false forbids pulling it"
+                    )
+                    raise ValueError(
+                        f"Docker image '{self.image_name}' not found locally and "
+                        f"{reason}. Pull it before scanning."
+                    )
+                if not self._pull_image():
+                    raise ValueError(
+                        f"Docker image '{self.image_name}' not found locally and could "
+                        f"not be pulled. Check the name and your registry access."
+                    )
             except FileNotFoundError:
                 raise ValueError(
                     "Docker command not found. Please ensure Docker is installed and accessible in your PATH."
@@ -465,6 +491,30 @@ class DockerSecurityScanner:
 
         return results 
           
+    def _pull_image(self) -> bool:
+        """Fetch an image that is not present locally.
+
+        Returns True when the image is available afterwards. Network failures,
+        bad names and private registries all surface the same way - as a False
+        the caller turns into a clear error - because the distinction does not
+        change what the user has to do.
+        """
+        logger.info(f"Image {self.image_name} not present locally; pulling it")
+        try:
+            subprocess.run(
+                ['docker', 'pull', self.image_name],
+                capture_output=True,
+                check=True,
+                text=True,
+                timeout=600,
+                shell=False,
+            )
+            return True
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError) as e:
+            stderr = getattr(e, 'stderr', '') or ''
+            logger.error(f"Failed to pull {self.image_name}: {stderr.strip() or e}")
+            return False
+
     def _check_tools(self) -> List[str]:
         """Check if all required tools are installed and return list of missing tools."""
         missing_tools = []

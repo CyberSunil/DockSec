@@ -68,5 +68,16 @@ if [ "${INPUT_IMAGE_ONLY}" = "true" ]; then
   ARGS+=("--image-only")
 fi
 
-printf 'Running: docksec'; printf ' %q' "${ARGS[@]}"; printf '\n'
+# Forward anything given on the command line. Without this the image only
+# honours the INPUT_* variables, so `docker run ... --version` and every other
+# direct CLI invocation fails with "Dockerfile path is required".
+ARGS+=("$@")
+
+# printf runs its format once even for an empty array, so guard the log line:
+# otherwise a bare `docksec` is reported as `docksec ''`.
+if [ ${#ARGS[@]} -eq 0 ]; then
+  printf 'Running: docksec\n'
+else
+  printf 'Running: docksec'; printf ' %q' "${ARGS[@]}"; printf '\n'
+fi
 docksec "${ARGS[@]}"

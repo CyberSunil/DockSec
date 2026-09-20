@@ -615,6 +615,16 @@ Image scan results are cached (default: 24 hours, override with
 such as a reused `:latest` always gets a fresh scan. Use `--no-cache` (or
 `DOCKSEC_USE_CACHE=false`) to bypass the cache for a run.
 
+### Pulling images that are not local
+
+Scanning an image that is not present locally pulls it first. A compose stack
+routinely names images the machine has never pulled, and without this every one
+of those services is reported as unscanned.
+
+Set `DOCKSEC_PULL_MISSING_IMAGES=false` to turn this off and fail instead, which
+is worth doing on a metered connection or a shared runner. `--offline` never
+pulls, regardless of this setting.
+
 ---
 
 ## AI-assistant skills (`install-skill`)

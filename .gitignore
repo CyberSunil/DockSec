@@ -201,6 +201,7 @@ CURSOR_CONFIGURATION.md
 docs/promptfoo-benchmark-review.md
 docs/docksec-strategy-2026.md
 docs/cve-lite-cli-comparison.md
+docs/session-handoff.md
 ROADMAP.md
 
 # Claude Code project instructions (local only, not for public repository)
@@ -208,3 +209,5 @@ CLAUDE.md
 
 # macOS
 .DS_Store
+docs/e2e-findings-2026-09-20.md
+
