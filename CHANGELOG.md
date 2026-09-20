@@ -50,6 +50,19 @@ All notable changes to DockSec are documented in this file.
 
 ### Fixed
 
+- Refreshed the hardened compose example's base images (`nginx:1.25.3-alpine` ->
+  `1.31.6-alpine`, `postgres:15.5-alpine` -> `15.19-alpine`). The old pins dated
+  from June and carried 35 CRITICAL/HIGH CVEs, which nothing surfaced while the
+  example's images were silently failing to scan. nginx is now clean; the
+  remaining 22 findings are all in the Go `stdlib` compiled into the official
+  postgres image, which has no fix available upstream at any tag - `18.6-alpine`
+  reports exactly the same 22, so staying on the 15 line costs nothing and keeps
+  the example about configuration rather than a major version upgrade.
+
+- CodeQL now scans the workflow files themselves (`language: actions`). It was
+  already expecting that configuration and warned on every pull request that it
+  could not find one, so workflow changes were going unanalyzed.
+
 - **The container image ignored every command-line argument.** `entrypoint.sh`
   built its argument list only from the Action's `INPUT_*` variables and never
   forwarded `"$@"`, so `docker run ghcr.io/owasp/docksec:latest --version` and

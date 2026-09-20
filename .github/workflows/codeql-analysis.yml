@@ -22,7 +22,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'python' ]
+        # 'actions' scans the workflow files themselves. CodeQL was already
+        # expecting a /language:actions configuration and warned on every pull
+        # request that it could not find one, so workflow changes were going
+        # unscanned - including the two workflows edited in #187.
+        language: [ 'python', 'actions' ]
 
     steps:
     - name: Checkout repository
@@ -35,7 +39,10 @@ jobs:
         # Run additional queries for comprehensive security analysis
         queries: +security-extended,security-and-quality
 
+    # Autobuild resolves source dependencies; the 'actions' language analyses
+    # YAML in place and has nothing to build.
     - name: Autobuild
+      if: matrix.language != 'actions'
       uses: github/codeql-action/autobuild@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
 
     - name: Perform CodeQL Analysis
