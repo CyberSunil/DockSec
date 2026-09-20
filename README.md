@@ -326,8 +326,7 @@ files and print JSON in the same run. All human-readable messages move to stderr
 
 ### Report formats
 
-`--format` accepts a comma-separated list of file outputs. The four built-in report
-types are:
+`--format` accepts a comma-separated list of file outputs:
 
 | Format | What you get |
 |--------|----------------|
@@ -335,6 +334,10 @@ types are:
 | `csv` | A `.csv` table of findings (ID, severity, package, version, title, and related fields). |
 | `pdf` | A printable PDF summary with scan info, scores, and vulnerability details. |
 | `html` | A styled HTML report for browsing results in a browser. |
+| `markdown` | A `.md` report that renders natively in pull request comments and CI job summaries. Opt-in: not written unless requested. |
+
+`json`, `csv`, `pdf`, and `html` are written by default; add `markdown` explicitly to
+get it.
 
 **CSV with zero findings:** if a scan reports no vulnerabilities but `csv` is in your
 `--format` list, DockSec still writes a CSV file containing only the column headers.
@@ -344,23 +347,6 @@ rely on a stable schema even on clean scans.
 For stdout JSON and piping into other tools, see [Machine-readable output](#machine-readable-output)
 above. For CI and GitHub Code Scanning, use `--sarif` (see the next section); SARIF is
 separate from `--format` and is always emitted when requested.
-
-### Report formats
-
-The `--format` flag controls which report files DockSec generates.
-
-| Format | Description |
-| --- | --- |
-| `json` | Structured machine-readable report for automation and integrations. See the [Machine-readable output](#machine-readable-output) section for details on JSON output behavior. |
-| `csv` | Tabular report suitable for spreadsheets, reporting pipelines, and bulk analysis of findings. |
-| `pdf` | Human-readable report designed for sharing, review, and archival purposes. |
-| `html` | Interactive browser-based report with formatted findings and navigation for easier review. |
-
-> **Note**
->
-> When no vulnerabilities are found, CSV output is still generated with column headers only and no data rows. This header-only CSV is intentional behavior and does not indicate an error.
-
-For GitHub Code Scanning integration details, see the [SARIF output for GitHub Code Scanning](#sarif-output-for-github-code-scanning) section.
 
 ### SARIF output for GitHub Code Scanning
 

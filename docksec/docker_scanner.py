@@ -119,30 +119,45 @@ class DockerSecurityScanner:
     @staticmethod
     def _validate_file_path(file_path: str) -> Path:
         """
-        Validate and sanitize file path to prevent path traversal attacks.
-        
+        Resolve a user-supplied file path.
+
+        Rejecting any path containing '..' was simple but wrong: it blocked
+        ordinary relative paths such as `docksec ../service/Dockerfile`, the
+        standard invocation in a monorepo where each service has its own
+        directory. It also gave no real protection - DockSec is a local CLI, the
+        path comes from the user's own command line, and it is read with the
+        user's own permissions, so there is no privilege boundary for a
+        traversal check to defend.
+
+        What matters instead is that the path resolves to something that exists
+        and is a regular file, so a directory or a dangling symlink fails here
+        with a clear message rather than deeper in a scanner subprocess.
+
         Args:
             file_path: Path to validate
-            
+
         Returns:
-            Path object if valid
-            
+            Resolved Path object
+
         Raises:
-            ValueError: If path is invalid or contains path traversal attempts
+            ValueError: If the path is empty, unresolvable, missing, or is not
+                a regular file
         """
         if not file_path:
             raise ValueError("File path cannot be empty")
 
-        # Check the raw string before resolution — Path.resolve() removes '..'
-        # so checking the resolved path would silently allow traversal attempts.
-        if '..' in file_path:
-            raise ValueError(f"Invalid path: path traversal detected in '{file_path}'")
-
         try:
-            path = Path(file_path).resolve()
-            return path
-        except (OSError, ValueError) as e:
+            resolved = Path(file_path).resolve()
+        except (OSError, ValueError, RuntimeError) as e:
             raise ValueError(f"Invalid file path '{file_path}': {str(e)}")
+
+        if resolved.is_dir():
+            raise ValueError(
+                f"'{file_path}' is a directory; provide the path to a "
+                f"Dockerfile (for example {file_path.rstrip('/')}/Dockerfile)"
+            )
+
+        return resolved
     
     @staticmethod
     def _validate_image_name(image_name: str) -> str:
