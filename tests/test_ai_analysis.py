@@ -345,3 +345,65 @@ class TestFailureHandling(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMalformedStructuredOutput(unittest.TestCase):
+    """A model that returns a nested field as a JSON string must not cost the
+    user the whole analysis.
+
+    Observed against a live model on a 19-finding compose stack: `chains` came
+    back as a JSON-encoded string, Pydantic rejected the response, and the
+    entire correlation pass was discarded even though its content was correct.
+    A stubbed client cannot surface this, so the regression lives here.
+    """
+
+    def test_json_string_chains_are_parsed(self):
+        import json
+
+        analysis = CorrelatedAnalysis(
+            summary="s",
+            chains=json.dumps([{
+                "title": "c", "severity": "CRITICAL", "finding_ids": ["a"],
+                "narrative": "n", "fix": "f",
+            }]),
+        )
+        self.assertEqual(len(analysis.chains), 1)
+        self.assertEqual(analysis.chains[0].title, "c")
+
+    def test_json_string_findings_are_parsed(self):
+        import json
+
+        analysis = CorrelatedAnalysis(
+            summary="s",
+            findings=json.dumps([{
+                "finding_id": "DS002", "title": "t", "severity": "HIGH",
+                "category": "misconfiguration", "why_it_matters": "w",
+                "fix": "f", "confidence": "high",
+            }]),
+        )
+        self.assertEqual(len(analysis.findings), 1)
+
+    def test_list_wrapped_in_its_own_field_name_is_unwrapped(self):
+        import json
+
+        analysis = CorrelatedAnalysis(
+            summary="s",
+            chains=json.dumps({"chains": [{
+                "title": "w", "severity": "HIGH", "finding_ids": ["b"],
+                "narrative": "n", "fix": "f",
+            }]}),
+        )
+        self.assertEqual(len(analysis.chains), 1)
+        self.assertEqual(analysis.chains[0].title, "w")
+
+    def test_a_real_list_is_unaffected(self):
+        analysis = CorrelatedAnalysis(summary="s", chains=[{
+            "title": "ok", "severity": "LOW", "finding_ids": [],
+            "narrative": "n", "fix": "f",
+        }])
+        self.assertEqual(analysis.chains[0].title, "ok")
+
+    def test_unparseable_string_degrades_to_empty(self):
+        """Losing one field beats losing the analysis."""
+        analysis = CorrelatedAnalysis(summary="s", chains="not json at all")
+        self.assertEqual(analysis.chains, [])

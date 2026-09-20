@@ -34,7 +34,7 @@ from docksec.config import (
 )
 from docksec.enums import LLMProvider
 try:
-    from pydantic import BaseModel, Field
+    from pydantic import BaseModel, Field, field_validator
 except ImportError:
     try:
         from langchain_core.pydantic_v1 import BaseModel, Field
@@ -191,6 +191,37 @@ class ExploitChain(BaseModel):
     fix: str = Field(description="The single change that breaks the chain most effectively")
 
 
+def _coerce_to_list(value):
+    """Accept a JSON-encoded string where a list is expected.
+
+    On larger inputs a model sometimes returns a nested field as a JSON string
+    rather than a list - observed with a 19-finding compose stack, where the
+    whole analysis was discarded by a validation error even though the content
+    was correct and complete. Parsing it costs nothing and turns a total loss
+    into a usable result.
+    """
+    if isinstance(value, str):
+        import json as _json
+
+        text = value.strip()
+        if not text:
+            return []
+        try:
+            parsed = _json.loads(text)
+        except ValueError:
+            return []
+        # Some replies wrap the list in its own field name.
+        if isinstance(parsed, dict):
+            for candidate in ("chains", "findings", "items"):
+                if isinstance(parsed.get(candidate), list):
+                    return parsed[candidate]
+            return []
+        if isinstance(parsed, list):
+            return parsed
+        return []
+    return value
+
+
 class CorrelatedAnalysis(BaseModel):
     """Structured output of the correlation pass."""
 
@@ -214,6 +245,13 @@ class CorrelatedAnalysis(BaseModel):
             "findings genuinely combine - do not invent one."
         ),
     )
+
+    # Runs before validation, so a JSON-encoded list is parsed rather than
+    # rejected. Without this a single mis-shaped field discards the whole
+    # analysis; see _coerce_to_list.
+    _coerce_findings = field_validator("findings", mode="before")(_coerce_to_list)
+    _coerce_chains = field_validator("chains", mode="before")(_coerce_to_list)
+
 
 class ScoreResponse(BaseModel):
     score: float = Field(description="Security score for the Dockerfile")
