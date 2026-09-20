@@ -1,0 +1,21 @@
+# Node.js service with the mistakes that show up most often in real repositories.
+# Expected: root user, unpinned base image, secret in ENV, ADD over COPY,
+# unpinned apt packages, no HEALTHCHECK.
+FROM node:latest
+
+WORKDIR /app
+
+ENV NPM_TOKEN=npm_abcdefghijklmnopqrstuvwxyz0123456789
+ENV DATABASE_URL=postgres://admin:hunter2@db:5432/app
+
+RUN apt-get update && apt-get install -y curl git
+
+ADD https://example.com/config.tar.gz /app/config/
+
+COPY package.json package-lock.json ./
+RUN npm install
+
+COPY . .
+
+EXPOSE 3000
+CMD ["node", "server.js"]

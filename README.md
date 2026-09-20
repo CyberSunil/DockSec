@@ -725,6 +725,8 @@ always in a position to undo the change.
 | [Exploit chains](docs/exploit-chains.md) | Cross-service attack paths, and their limits |
 | [Compose rule reference](docs/rules/README.md) | All 17 rules: what each catches, and when keeping it is reasonable |
 | [CI integration](docs/ci/README.md) | Jenkins, GitLab, Azure Pipelines, pre-commit |
+| [Examples](examples/README.md) | Ten Dockerfiles and compose stacks with their expected findings |
+| [Case studies](docs/case-studies/README.md) | Real scans of official images, with the numbers |
 
 ## Roadmap
 

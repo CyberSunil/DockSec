@@ -6,6 +6,37 @@ All notable changes to DockSec are documented in this file.
 
 ### Added (adoption)
 
+- **Golden-file tests for the three output surfaces.** The terminal summary,
+  the `--json` payload and the SARIF report are now compared against stored
+  files, so an unintended change to any of them fails CI rather than reaching
+  a user. Re-record deliberately with `DOCKSEC_UPDATE_GOLDEN=1 pytest
+  tests/test_golden_output.py` and review the diff. This closes the gap that
+  let the fix-command ordering and the SARIF severity fallback change without
+  a test noticing.
+
+- **Ten examples with documented expected findings**
+  (`examples/README.md`). Eight Dockerfiles across Node, Python, Java, Go and
+  BuildKit secret mounts, plus the two compose stacks, each insecure file
+  paired with a hardened counterpart so the delta is the lesson. Two are
+  deliberately instructive: the distroless Go image reports a HEALTHCHECK
+  finding that is correct to keep, and the BuildKit example passes a secret to
+  a build without tripping the secret rule.
+
+- **Three case studies against official images** (`docs/case-studies/`):
+  `node:18` (2,200 findings, 9 worth acting on today), `python:3.12-slim`
+  (44 findings, none with an available fix), and `nginx:1.31.6-alpine`
+  (clean, and what that does not prove). Official images were chosen so the
+  numbers are reproducible and no third party is named unfavourably.
+
+- **Pull-request comment mode**, as a two-stage workflow. `pr-scan.yml` runs
+  in the untrusted pull-request context with `contents: read` and no secrets,
+  and emits data only; `pr-comment.yml` runs on `workflow_run` in the base
+  repository, reads just that artifact, and renders the comment. The renderer
+  escapes every value it prints, because a fork controls the text of its own
+  findings; the PR number is validated as an integer before use. The comment
+  is updated in place rather than reposted, and rows lead with `Fix Now`.
+
+
 - **`docksec --fix`** applies the mechanical subset of the suggested Dockerfile
   changes, re-scans, and reports the before/after finding counts. It adds a
   non-root `USER` before `CMD`, inserts a placeholder `HEALTHCHECK`, adds

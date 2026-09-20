@@ -1,0 +1,100 @@
+{
+  "priority_counts": {
+    "fix_now": 1,
+    "fix_soon": 1,
+    "low_priority": 0,
+    "monitor": 0
+  },
+  "scan_info": {
+    "analysis_score": 41.5,
+    "dockerfile": "Dockerfile",
+    "image": "postgres:15.19-alpine",
+    "scan_mode": "compose",
+    "scan_time": "2026-01-01T00:00:00",
+    "score_version": 2
+  },
+  "severity_counts": {
+    "CRITICAL": 1,
+    "HIGH": 3,
+    "LOW": 0,
+    "MEDIUM": 1,
+    "UNKNOWN": 0
+  },
+  "vulnerabilities": [
+    {
+      "CVSS": "7.5",
+      "Description": "A DoS in OpenSSL.",
+      "EPSS": 0.48211,
+      "EPSSPercentile": 0.98805,
+      "FixedVersion": "3.5.7",
+      "InstalledVersion": "3.5.1",
+      "PkgName": "openssl",
+      "PrimaryURL": "https://example.invalid/CVE-2025-15467",
+      "Priority": "fix_now",
+      "Severity": "HIGH",
+      "Status": "fixed",
+      "Target": "db (postgres)",
+      "Title": "openssl: denial of service",
+      "VulnerabilityID": "CVE-2025-15467"
+    },
+    {
+      "CVSS": "9.8",
+      "Description": "Memory corruption in perl.",
+      "EPSS": 0.00176,
+      "EPSSPercentile": 0.07405,
+      "FixedVersion": "5.40.2",
+      "InstalledVersion": "5.40.1",
+      "PkgName": "libperl",
+      "PrimaryURL": "https://example.invalid/CVE-2026-31789",
+      "Priority": "fix_soon",
+      "Severity": "CRITICAL",
+      "Status": "fixed",
+      "Target": "db (postgres)",
+      "Title": "perl: memory corruption",
+      "VulnerabilityID": "CVE-2026-31789"
+    },
+    {
+      "CVSS": null,
+      "Description": "No fix available.",
+      "FixedVersion": null,
+      "InstalledVersion": "1.3",
+      "PkgName": "zlib",
+      "PrimaryURL": null,
+      "Severity": "MEDIUM",
+      "Status": "affected",
+      "Target": "db (postgres)",
+      "Title": "zlib: unfixed issue",
+      "VulnerabilityID": "CVE-2026-99999"
+    },
+    {
+      "CVSS": null,
+      "Description": "POSTGRES_PASSWORD is set in the compose file.",
+      "FixedVersion": null,
+      "InstalledVersion": null,
+      "PkgName": "compose",
+      "PrimaryURL": null,
+      "Remediation": "Move the value to a Docker secret",
+      "Severity": "HIGH",
+      "Status": "affected",
+      "Target": "compose.yml:db:12",
+      "Title": "Plaintext credential in environment",
+      "VulnerabilityID": "compose-plaintext-secret-env"
+    },
+    {
+      "CVSS": null,
+      "Description": "No USER instruction.",
+      "FixedVersion": null,
+      "InstalledVersion": null,
+      "Line": 7,
+      "PkgName": "dockerfile",
+      "PrimaryURL": null,
+      "Remediation": "Add a non-root USER before CMD",
+      "Severity": "HIGH",
+      "Source": "trivy",
+      "Status": "affected",
+      "Target": "Dockerfile",
+      "Title": "Image runs as root",
+      "VulnerabilityID": "DS002"
+    }
+  ]
+}

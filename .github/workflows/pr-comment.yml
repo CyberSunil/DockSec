@@ -1,0 +1,105 @@
+# Stage two of two: render the scan results and post them as a PR comment.
+#
+# THREAT MODEL. This workflow runs on `workflow_run`, so it executes in the
+# BASE repository's context with a token that can write comments - even when
+# the pull request came from a fork. That makes it a privileged workflow, and
+# it is written accordingly:
+#
+#   - It never checks out the pull request's code. The only thing it reads
+#     from the PR is the artifact stage one produced.
+#   - It runs no code from the PR: no build, no install of the PR's
+#     dependencies, no scanning. Stage one already did all of that, without
+#     privileges.
+#   - The artifact's contents are untrusted data. `render_pr_comment.py`
+#     escapes every value before it reaches the comment body, because a fork
+#     controls the text of its own findings.
+#   - The PR number comes from the artifact and is validated as an integer
+#     before use.
+#
+# If you change this workflow, keep those four properties. Checking out the
+# head ref here, or scanning here, would hand a fork the base repo's token.
+
+name: PR comment
+
+on:
+  workflow_run:
+    workflows: ["PR scan"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  comment:
+    name: Post scan results
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read
+    steps:
+      # Only the scripts are checked out, from the base repository, never the
+      # pull request's revision.
+      - name: Checkout the base repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: false
+
+      - name: Set up Python
+        uses: actions/setup-python@e9d6f990972a57673cdb72ec29e19d42ba28880f # v6.0.0
+        with:
+          python-version: '3.13'
+
+      - name: Download the findings
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          name: docksec-pr-scan
+          path: pr-scan
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read the PR number
+        id: pr
+        run: |
+          set -euo pipefail
+          raw="$(cat pr-scan/pr-number.txt 2>/dev/null || echo '')"
+          # The artifact is attacker-controlled, so this must be an integer
+          # before it is ever used as an API path segment.
+          if ! printf '%s' "${raw}" | grep -Eq '^[0-9]+$'; then
+            echo "::error::pr-number.txt is not a plain integer"
+            exit 1
+          fi
+          echo "number=${raw}" >> "$GITHUB_OUTPUT"
+
+      - name: Render the comment
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/render_pr_comment.py \
+            pr-scan/results.json --out comment.md
+          echo "--- rendered ---"
+          cat comment.md
+
+      # Update the existing comment rather than adding one per push, so a busy
+      # pull request does not accumulate a wall of bot comments.
+      - name: Post or update the comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          existing="$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+            --jq '.[] | select(.body | startswith("<!-- docksec-pr-comment -->")) | .id' \
+            | head -n 1)"
+
+          if [ -n "${existing}" ]; then
+            gh api --method PATCH "repos/${REPO}/issues/comments/${existing}" \
+              -F body=@comment.md > /dev/null
+            echo "updated comment ${existing}"
+          else
+            gh api --method POST "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+              -F body=@comment.md > /dev/null
+            echo "posted a new comment"
+          fi
