@@ -142,16 +142,31 @@ jobs:
           fi
           echo "Hadolint findings present."
 
-      # Gated on a compose scan rather than the Dockerfile above: --fail-on
-      # evaluates structured findings in json_data, and Hadolint output is not
-      # yet parsed into that shape, so a Dockerfile-only scan has nothing for
-      # the gate to see. Revisit once Hadolint findings are structured.
+      # This step tests the --fail-on gate, so the compose file is shaped to
+      # isolate it from the per-service image scan.
+      #
+      # The DockSec image contains no Docker CLI - it is a scanning image, not a
+      # Docker-in-Docker one - so any service naming a pullable image fails its
+      # per-service scan. DockSec then exits 3 for an incomplete scan in
+      # preference to the gate's exit 1, which is correct behaviour but means
+      # the exit code no longer tells us anything about the gate.
+      #
+      # A service with neither a resolvable Dockerfile nor an image is skipped
+      # entirely, so no service scan is attempted and no detection gap is
+      # recorded. The static compose rules still fire on privileged/secret/port,
+      # and the exit code reflects the gate alone.
+      #
+      # Per-service image scanning is exercised by the Dockerfile scan earlier
+      # in this workflow and by the self-scan workflow; it is deliberately not
+      # what this assertion covers.
       - name: Create a vulnerable compose file
         run: |
           cat > smoke-workspace/docker-compose.yml <<'EOF'
           services:
             db:
-              image: postgres:16
+              build:
+                context: .
+                dockerfile: Dockerfile.not-present
               privileged: true
               environment:
                 - POSTGRES_PASSWORD=supersecret
@@ -162,27 +177,51 @@ jobs:
       - name: Assert --fail-on gates the build
         run: |
           set +e
-          docker run --rm \
-            -v "${PWD}/smoke-workspace:/github/workspace" \
-            -e INPUT_COMPOSE=docker-compose.yml \
-            -e INPUT_SCAN_ONLY=true \
-            -e INPUT_FAIL_ON=critical \
-            docksec:smoke >/dev/null 2>&1
+          output="$(
+            docker run --rm \
+              -v "${PWD}/smoke-workspace:/github/workspace" \
+              -e INPUT_COMPOSE=docker-compose.yml \
+              -e INPUT_SCAN_ONLY=true \
+              -e INPUT_FAIL_ON=critical \
+              docksec:smoke 2>&1
+          )"
           code=$?
           set -e
-          # 0 would mean the gate never fired; 2 (usage) or 3 (tool error) mean
-          # the run broke rather than gated.
+
+          # Print the output whatever happens: discarding it meant a failure
+          # here reported only an exit code, with no way to tell a broken scan
+          # from a gate that did not fire.
+          printf '%s\n' "$output"
+
+          # 0 means the gate never fired; 2 is a usage error and 3 means the
+          # scan did not complete - both are breakage, not gating, and must not
+          # be accepted here.
           if [ "$code" -ne 1 ]; then
             echo "::error::expected exit 1 from --fail-on critical, got $code"
             exit 1
           fi
           echo "Gate fired correctly (exit 1)."
 
-      - name: Assert a clean run still exits 0
+      # The same vulnerable file without --fail-on: findings are reported but
+      # nothing gates, so the run succeeds. This is what distinguishes "found
+      # problems" from "was asked to block on them".
+      - name: Assert a run without a gate still exits 0
         run: |
-          docker run --rm \
-            -v "${PWD}/smoke-workspace:/github/workspace" \
-            -e INPUT_COMPOSE=docker-compose.yml \
-            -e INPUT_SCAN_ONLY=true \
-            docksec:smoke >/dev/null 2>&1
+          set +e
+          output="$(
+            docker run --rm \
+              -v "${PWD}/smoke-workspace:/github/workspace" \
+              -e INPUT_COMPOSE=docker-compose.yml \
+              -e INPUT_SCAN_ONLY=true \
+              docksec:smoke 2>&1
+          )"
+          code=$?
+          set -e
+
+          printf '%s\n' "$output"
+
+          if [ "$code" -ne 0 ]; then
+            echo "::error::expected exit 0 without --fail-on, got $code"
+            exit 1
+          fi
           echo "Ungated run exits 0 as expected."
