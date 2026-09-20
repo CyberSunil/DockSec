@@ -7,4 +7,4 @@ authors:
     given-names: "Advait"
 repository-code: "https://github.com/OWASP/DockSec"
 license: MIT
-version: "2026.8.19"
+version: "2026.9.20rc3"
