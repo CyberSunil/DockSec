@@ -246,7 +246,18 @@ docksec install-skill
 docksec Dockerfile --scan-only --quiet                  # warnings, errors, summary only
 docksec Dockerfile --scan-only --verbose                # INFO-level diagnostics on stderr
 docksec Dockerfile --scan-only --verbose --log-file logs/docksec.log
+docksec Dockerfile --scan-only --compact-output         # shorter per-finding output
 docksec Dockerfile --no-color                           # also honors NO_COLOR
+
+# Apply the mechanical Dockerfile fixes (keeps a .bak, re-scans, shows the delta)
+docksec Dockerfile --scan-only --fix --dry-run          # print the diff, change nothing
+docksec Dockerfile --scan-only --fix
+
+# Rank findings by severity alone, with no EPSS lookup and no network call
+docksec Dockerfile --scan-only --no-epss
+
+# Treat a scan that could not complete as a failure, not a pass
+docksec Dockerfile --scan-only --fail-on high --incomplete-policy fail
 ```
 
 ---
