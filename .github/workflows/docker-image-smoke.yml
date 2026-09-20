@@ -94,6 +94,42 @@ jobs:
           CMD ["node","server.js"]
           EOF
 
+      # The image must also behave like the CLI it wraps. `--version` and
+      # `--help` are the first two commands anyone runs against an unfamiliar
+      # image, and both failed in 2026.9.20: entrypoint.sh built its arguments
+      # only from INPUT_* and never forwarded "$@". Every other step in this
+      # file reaches DockSec through `--entrypoint sh` or INPUT_*, so nothing
+      # here caught it.
+      - name: Assert command-line arguments reach the CLI
+        run: |
+          set -euo pipefail
+
+          # The entrypoint echoes the command it is about to run, so match
+          # anywhere in the output rather than anchoring at the start.
+          version_output="$(docker run --rm docksec:smoke --version)"
+          echo "${version_output}"
+          case "${version_output}" in
+            *DockSec*) ;;
+            *) echo "::error::--version did not reach the CLI"; exit 1 ;;
+          esac
+
+          help_output="$(docker run --rm docksec:smoke --help)"
+          case "${help_output}" in
+            *"usage: docksec"*) ;;
+            *) echo "::error::--help did not reach the CLI"; exit 1 ;;
+          esac
+
+          # A positional argument plus a flag: the shape a direct CLI user types.
+          docker run --rm \
+            -v "${PWD}/smoke-workspace:/work" -w /work \
+            docksec:smoke Dockerfile --scan-only > cli-form.txt 2>&1 || true
+          if ! grep -q "security findings" cli-form.txt; then
+            echo "::error::a positional Dockerfile argument did not reach the CLI"
+            cat cli-form.txt
+            exit 1
+          fi
+          echo "command-line arguments reach the CLI"
+
       # The core assertion: a scan runs to completion through the Action's own
       # entrypoint and produces findings. Uses --scan-only so no API key is
       # needed; AI analysis is not what this test covers.
