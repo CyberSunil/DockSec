@@ -11,6 +11,28 @@ name: Publish Container Image
 # look broken).
 
 on:
+  # Called directly by the release workflow. This cannot be left to the tag
+  # trigger below: a tag pushed with GITHUB_TOKEN does not start further
+  # workflows - GitHub suppresses that to prevent recursion - so the
+  # v2026.9.20rc1 release completed with no image published and nothing in the
+  # run to indicate it was missing.
+  workflow_call:
+    inputs:
+      ref:
+        description: 'Git ref to build from (the release tag)'
+        required: true
+        type: string
+      image_tag:
+        description: 'Version tag to publish, without a leading v'
+        required: true
+        type: string
+      publish_latest:
+        description: 'Also publish :latest (false for pre-releases)'
+        required: false
+        default: false
+        type: boolean
+
+  # Retained for a tag pushed by a person, where the trigger does fire.
   push:
     tags:
       - 'v*'
@@ -42,6 +64,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          # Empty for a tag push or manual dispatch, where the default ref is
+          # already correct.
+          ref: ${{ inputs.ref || '' }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
@@ -68,12 +94,15 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            # `latest` must not follow a pre-release. A v2026.9.20-rc1 tag
-            # should publish :2026.9.20-rc1 for testing without moving the tag
-            # every `docker run ghcr.io/owasp/docksec` in the README resolves
-            # to. docker/metadata-action excludes prereleases from this by
-            # default when the pattern is semver-aware.
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
+            # Called from the release workflow: the version and whether it is a
+            # pre-release are passed in explicitly, because github.ref is the
+            # caller's ref rather than the tag.
+            type=raw,value=${{ inputs.image_tag }},enable=${{ inputs.image_tag != '' }}
+            type=raw,value=latest,enable=${{ inputs.publish_latest }}
+            # Tag push or manual dispatch. `latest` must not follow a
+            # pre-release: it is what every `docker run ghcr.io/owasp/docksec`
+            # in the README resolves to.
+            type=raw,value=latest,enable=${{ inputs.image_tag == '' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') && !contains(github.ref, 'rc') }}
             type=raw,value=${{ inputs.tag }},enable=${{ inputs.tag != '' }}
             type=raw,value=build-${{ github.run_number }},enable=${{ github.event_name == 'workflow_dispatch' && inputs.tag == '' }}
           labels: |
