@@ -18,6 +18,11 @@ import sys
 from pathlib import Path
 
 MAX_ROWS = 15
+# GitHub rejects an issue comment body over 65536 characters. A pull request
+# touching many compose services can exceed that, and a rejected comment means
+# the whole job fails with nothing posted - so the body is budgeted and
+# truncated rather than sent hopefully.
+MAX_BODY = 60000
 SEVERITY_ORDER = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "UNKNOWN": 4}
 MARKER = "<!-- docksec-pr-comment -->"
 
@@ -105,7 +110,7 @@ def render(payload: dict) -> str:
         else f"No CRITICAL or HIGH findings across {len(files)} file(s)."
     )
 
-    return "\n".join([
+    head = [
         MARKER,
         "## DockSec",
         "",
@@ -113,10 +118,25 @@ def render(payload: dict) -> str:
         f"\n{total} finding(s) in total. Ordered by exploitation likelihood (EPSS), "
         "so the top rows are what to fix first.",
         "",
-        *blocks,
-        "",
-        "<sub>Run locally: `docksec <file> --scan-only`</sub>",
-    ])
+    ]
+    foot = ["", "<sub>Run locally: `docksec <file> --scan-only`</sub>"]
+
+    # Keep whole per-file blocks while they fit, then say how many were
+    # dropped. Truncating mid-table would produce broken Markdown.
+    budget = MAX_BODY - len("\n".join(head + foot))
+    kept = []
+    for index, block in enumerate(blocks):
+        if budget - (len(block) + 1) < 0:
+            remaining = len(blocks) - index
+            kept.append(
+                f"\n_{remaining} more file(s) not shown - the full result "
+                f"exceeds GitHub's comment size limit._"
+            )
+            break
+        budget -= len(block) + 1
+        kept.append(block)
+
+    return "\n".join(head + kept + foot)
 
 
 def main() -> int:

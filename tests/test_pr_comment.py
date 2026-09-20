@@ -84,6 +84,52 @@ class TestUntrustedInputIsEscaped(unittest.TestCase):
         self.assertIn("DockSec", out)
 
 
+class TestCommentFitsGithubsLimit(unittest.TestCase):
+    """GitHub rejects a comment body over 65536 characters.
+
+    The per-file row cap does not bound the total: a pull request touching
+    many compose services produced a 156KB body, which the API refuses - so
+    the job failed and nothing was posted at all.
+    """
+
+    def _many_files(self, count=50, per_file=2000):
+        files = []
+        for i in range(count):
+            findings = [
+                _finding(VulnerabilityID=f"CVE-2026-{j:05d}", Title="X" * 400)
+                for j in range(per_file)
+            ]
+            files.append({
+                "file": f"svc{i}/Dockerfile",
+                "data": {
+                    "scan_info": {"analysis_score": 10},
+                    "vulnerabilities": findings,
+                    "severity_counts": {
+                        "CRITICAL": 0, "HIGH": per_file, "MEDIUM": 0, "LOW": 0,
+                    },
+                },
+            })
+        return {"files": files}
+
+    def test_large_result_stays_under_the_limit(self):
+        out = render(self._many_files())
+        self.assertLess(len(out), 65536)
+
+    def test_truncation_is_declared(self):
+        out = render(self._many_files())
+        self.assertIn("more file(s) not shown", out)
+
+    def test_truncated_body_is_still_well_formed(self):
+        """Cutting mid-table would leave broken Markdown in the comment."""
+        out = render(self._many_files())
+        self.assertEqual(out.count("<details>"), out.count("</details>"))
+        self.assertTrue(out.rstrip().endswith("</sub>"))
+
+    def test_a_normal_result_is_not_truncated(self):
+        out = render(self._many_files(count=2, per_file=3))
+        self.assertNotIn("more file(s) not shown", out)
+
+
 class TestOrdering(unittest.TestCase):
     """The comment must lead with what to fix first, like the CLI does."""
 
