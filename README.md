@@ -309,7 +309,7 @@ which policy was applied.
 | `provider` | `--provider` | `openai`, `anthropic`, `google`, `ollama` |
 | `model` | `--model` | Model name for the provider |
 | `offline` | `--offline` | No network; skips AI and Docker Scout |
-| `skip_ai_scoring` | `--skip-ai-scoring` | Local scoring only |
+| `skip_ai_scoring` | `--skip-ai-scoring` | Deprecated and ignored; scoring is always deterministic |
 | `no_redact` | `--no-redact` | Do not mask secrets before the AI call |
 | `no_cache` | `--no-cache` | Bypass the scan cache |
 | `ignore_file` | `--ignore-file` | Waiver file path |

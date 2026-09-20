@@ -1,14 +1,15 @@
 """
 Security Score Calculator Module
 
-This module handles the calculation of security scores based on scan results.
-It uses LLM-based analysis to provide comprehensive security scoring.
+Computes the 0-100 security score from scan results. Deterministic by design:
+identical inputs always produce an identical score, because a CI gate and a
+compliance report both depend on that number.
 """
 
 import re
 from typing import Dict
 from docksec.enums import Severity
-from docksec.utils import ScoreResponse, get_llm, get_custom_logger
+from docksec.utils import get_custom_logger
 
 # Initialize logger
 logger = get_custom_logger(__name__)
@@ -27,90 +28,27 @@ SCORE_VERSION = 2
 
 class SecurityScoreCalculator:
     """
-    Calculates security scores for Docker images and Dockerfiles.
-    
-    Uses LLM-based analysis to evaluate security posture based on:
-    - Vulnerability severity and count
-    - Dockerfile best practices
-    - Security misconfigurations
-    - CVE scores
+    Calculates a deterministic security score for Docker images and Dockerfiles.
+
+    Scoring does not call a model. It previously asked an LLM to "Score Docker
+    security 1-100" from a count summary, so two runs over identical inputs
+    could disagree - indefensible for a number a CI gate and a compliance report
+    both depend on. The weighted breakdown below is the only path.
     """
-    
-    def __init__(self, skip_llm: bool = False):
-        """Initialize the security score calculator with LLM chain."""
-        logger.info("Initializing SecurityScoreCalculator")
-        if skip_llm:
-            self.score_chain = None
-            return
 
-        from docksec.enums import LLMProvider
-        from docksec.config_manager import get_config
-        from docksec.config import docker_score_prompt
-        config = get_config()
-        provider = config.llm_provider
-        llm = get_llm()
-        
-        if provider == LLMProvider.OPENAI:
-            self.score_chain = docker_score_prompt | llm.with_structured_output(
-                ScoreResponse, 
-                method="json_mode"
-            )
-        else:
-            self.score_chain = docker_score_prompt | llm.with_structured_output(ScoreResponse)
-    
+    def __init__(self, skip_llm: bool = True):
+        """Initialize the calculator.
+
+        ``skip_llm`` is retained for call-site compatibility and has no effect:
+        scoring is always local. It is accepted rather than removed so an
+        existing caller does not break on an unexpected keyword.
+        """
+        logger.debug("Initializing SecurityScoreCalculator (deterministic)")
+
     def calculate_score(self, results: Dict) -> float:
-        """
-        Calculate the security score based on scan results.
-        
-        This method analyzes:
-        - Dockerfile scan results (linting issues)
-        - Image vulnerability scan results
-        - Vulnerability severities and counts
-        - Overall security posture
-        
-        Args:
-            results: Dictionary containing scan results with keys:
-                - 'dockerfile_scan': Dockerfile linting results
-                - 'image_scan': Image vulnerability results
-                - 'json_data': Structured vulnerability data
-                - 'timestamp': Scan timestamp
-                - 'image_name': Docker image name
-                - 'dockerfile_path': Path to Dockerfile
-        
-        Returns:
-            float: Security score between 0-100 (higher is better)
-            
-        Raises:
-            Exception: If LLM call fails or score calculation errors occur
-        """
-        if self.score_chain is None:
-            # Fallback to local breakdown scoring
-            breakdown = self.get_score_breakdown(results)
-            return breakdown['overall']
+        """Return the overall score for a scan result."""
+        return self.get_score_breakdown(results)['overall']
 
-        logger.info("Calculating security score from scan results")
-        
-        try:
-            # Invoke LLM with scan results
-            score_response = self.score_chain.invoke({"results": results})
-            score = score_response.score
-            
-            logger.info(f"Security score calculated: {score}")
-            # The score and its rating band are rendered by the CLI summary
-            # (docksec.output.score); this method only computes and returns it.
-            return score
-
-        except Exception as e:
-            from docksec import output
-            logger.error(f"Error calculating security score: {e}", exc_info=True)
-            output.error(f"Error calculating security score: {e}")
-            output.info("Troubleshooting:")
-            output.detail("  1. Check your OpenAI API key and credits")
-            output.detail("  2. Verify network connectivity")
-            output.detail("  3. Review scan results format")
-            # Return a default score in case of error
-            logger.warning("Returning default score of 0 due to calculation error")
-            return 0.0
     
     def get_score_breakdown(self, results: Dict) -> Dict[str, float]:
         """
