@@ -908,12 +908,28 @@ class DockerSecurityScanner:
             'dockerfile_path': self.dockerfile_path
         }
 
-        # Run Dockerfile scan
+        # Run Dockerfile scan. Hadolint and Trivy's config scanner both run and
+        # produce structured findings, so Dockerfile issues participate in
+        # scoring, reports, --json, SARIF, and the --fail-on gate exactly as
+        # image vulnerabilities do.
         if self.dockerfile_path:
-            dockerfile_success, dockerfile_output = self.scan_dockerfile()
-            results['dockerfile_scan']['success'] = dockerfile_success
-            results['dockerfile_scan']['output'] = dockerfile_output
-            if not dockerfile_success:
+            from docksec import findings as findings_mod
+
+            dockerfile_findings, dockerfile_errors = findings_mod.scan_dockerfile_findings(
+                self.dockerfile_path, offline=getattr(self, 'offline', False)
+            )
+            findings_mod.report(dockerfile_findings, dockerfile_errors)
+
+            results['json_data'].extend(dockerfile_findings)
+            results['dockerfile_findings'] = dockerfile_findings
+            results['dockerfile_scan_errors'] = dockerfile_errors
+            # `success` means "no issues found", preserving the existing
+            # contract that the score calculator and reports rely on.
+            results['dockerfile_scan']['success'] = not dockerfile_findings
+            results['dockerfile_scan']['output'] = findings_mod.summarize(dockerfile_findings)
+            results['dockerfile_scan']['skipped'] = False
+            if dockerfile_errors:
+                # A scanner that could not run is a failure; findings are not.
                 scan_status = False
         else:
             results['dockerfile_scan']['success'] = True
@@ -929,10 +945,12 @@ class DockerSecurityScanner:
             if not image_success:
                 scan_status = False
 
-            # Get JSON data
+            # Get JSON data. Append rather than assign: the Dockerfile pass
+            # above has already put its findings in json_data, and overwriting
+            # would silently discard every one of them on a full scan.
             json_success, json_data = self.scan_image_json(severity)
             if json_success:
-                results['json_data'] = json_data
+                results['json_data'].extend(json_data)
 
             # Cache results
             if self.use_cache:

@@ -50,9 +50,14 @@ Everything scans locally; the only thing that ever leaves your machine is the (s
 
 DockSec follows a four-stage pipeline:
 
-1. **Scan**: Runs Trivy, Hadolint, and Docker Scout locally on your environment.
-2. **Analyze**: AI correlates findings across all scanners to remove noise and assess real-world impact.
-3. **Recommend**: Generates human-readable explanations and specific remediation steps.
+1. **Scan**: Runs Trivy (image vulnerabilities and Dockerfile misconfigurations),
+   Hadolint, and Docker Scout locally on your environment.
+2. **Prioritize**: Ranks every CVE finding by severity combined with its
+   [EPSS](https://www.first.org/epss/) exploitation likelihood, so the list is
+   ordered by what to fix first rather than by what was found first.
+3. **Recommend**: Produces copy-and-run fix commands and concrete Dockerfile or
+   compose changes, and states how many findings they resolve. With an API key,
+   an AI pass adds plain-English explanations.
 4. **Report**: Exports actionable results as HTML, PDF, JSON, CSV, Markdown, SARIF, and CycloneDX SBOM.
 
 ---
@@ -341,9 +346,56 @@ DockSec uses CI-friendly exit codes so builds and shells can react to results:
 | `2` | Usage or argument error |
 | `3` | Tool or runtime error (scan failed, image not found, missing tools) |
 
-`--fail-on` gates on the structured findings (image vulnerabilities and compose
-misconfigurations). When `--fail-on` is below the requested `--severity`, the scan
-severity is widened automatically so the gate can observe those findings.
+`--fail-on` gates on every structured finding: image vulnerabilities, Dockerfile
+misconfigurations, and compose misconfigurations. When `--fail-on` is below the
+requested `--severity`, the scan severity is widened automatically so the gate can
+observe those findings.
+
+### Incomplete scans
+
+If a scanner cannot run, results may be missing findings rather than genuinely
+clean. DockSec reports that as a detection gap in the Coverage block and in
+`--json` under `scan_info.completeness`. Use `--incomplete-policy fail` to exit `3`
+in that case, so CI cannot pass on a scan that did not finish:
+
+```bash
+docksec Dockerfile --incomplete-policy fail
+```
+
+### Priority: what to fix first
+
+Every CVE finding is scored against [EPSS](https://www.first.org/epss/), which
+estimates the probability it will be exploited in the next 30 days. Combining that
+with severity gives four tiers:
+
+| Tier | Meaning |
+|---|---|
+| **Fix Now** | Critical or high severity, and in the top 10% of CVEs by exploitation likelihood |
+| **Fix Soon** | Critical or high severity, but exploitation is less common |
+| **Monitor** | Lower severity, but actively exploited |
+| **Low Priority** | Lower severity, exploitation uncommon |
+
+This is the only network call DockSec makes outside the AI pass, and it is
+deliberately narrow: **only CVE IDs are sent** - no image names, no file contents,
+no paths. Scores are cached for 24 hours. `--offline` and `--no-epss` disable it,
+and any failure falls back to severity-only ranking rather than failing the scan.
+
+### Fix commands
+
+Scans end with concrete commands rather than a list of identifiers, and a plain
+statement of how many findings they resolve:
+
+```text
+Fix commands
+  > apt-get install --only-upgrade -y libgnutls30=3.7.9-2+deb12u7
+      CRITICAL - 3.7.9-2+deb12u4 -> 3.7.9-2+deb12u7  (CVE-2026-33845 +6)
+
+Dockerfile changes
+  - [CRITICAL] Move the secret out of ENV; inject it at runtime (line 4)
+  - [HIGH] Add a non-root USER before CMD/ENTRYPOINT (line 7)
+
+Applying all of the above resolves 37 of 93 finding(s); 56 have no mechanical fix yet.
+```
 
 ### Machine-readable output
 

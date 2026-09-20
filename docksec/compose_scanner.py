@@ -44,6 +44,11 @@ class ComposeScanner:
             "Target": f"{self.compose_path.name}:{service}:{line}",
             "PkgName": "docker-compose",
             "InstalledVersion": "N/A",
+            # A misconfiguration is fixed by editing the file, not by upgrading
+            # to a version, but the key must exist: every finding carries the
+            # same shape so report writers and the fix planner need no special
+            # cases. See tests/test_output_contract.py.
+            "FixedVersion": None,
             "Status": "affected",
             "CVSS": "N/A",
             "PrimaryURL": ""

@@ -196,6 +196,8 @@ def main() -> None:
     parser.add_argument('--sarif', dest='sarif', action='store_true', help='Write a SARIF 2.1.0 report for GitHub Code Scanning and other SARIF-compatible tools')
     parser.add_argument('--sbom', dest='sbom', action='store_true', help='Write a CycloneDX SBOM (.cdx.json) of the scanned image for supply-chain tooling (requires an image)')
     parser.add_argument('--offline', dest='offline', action='store_true', default=None, help='Run without network access: use the local Trivy DB (no DB update) and skip AI analysis')
+    parser.add_argument('--no-epss', dest='no_epss', action='store_true', default=None, help='Skip the EPSS exploitation-likelihood lookup and rank findings by severity alone (only CVE IDs are ever sent; implied by --offline)')
+    parser.add_argument('--incomplete-policy', dest='incomplete_policy', choices=['warn', 'fail'], default='warn', help="What to do when a scanner could not run: 'warn' reports the gap and continues (default), 'fail' exits 3 so CI cannot pass on an incomplete scan")
     parser.add_argument('--no-redact', dest='no_redact', action='store_true', default=None, help='Do not mask secret-looking values before sending file content to the AI provider')
     parser.add_argument('--no-cache', dest='no_cache', action='store_true', default=None, help='Bypass the scan results cache and force a fresh scan')
     parser.add_argument('--ignore-file', dest='ignore_file', metavar='FILE', help='Path to an ignore file listing findings to suppress (default: .docksec-ignore.yml in the current directory, if present)')
@@ -583,6 +585,35 @@ def main() -> None:
             # --json, or the --fail-on gate.
             _apply_disabled_rules(results, disabled_rules, output)
 
+            # EPSS exploitation likelihood, after suppressions so no request is
+            # made for a finding the team has already waived. Only CVE IDs are
+            # sent; any failure degrades to severity-only ranking and is
+            # recorded as a remediation gap rather than failing the scan.
+            epss_enabled = not args.no_epss and not args.offline
+            epss_candidates = sum(
+                1 for v in results.get("json_data", [])
+                if str(v.get("VulnerabilityID", "")).upper().startswith("CVE-")
+            )
+            epss_annotated = 0
+            if epss_enabled and epss_candidates:
+                from docksec import epss as epss_mod
+                epss_annotated = epss_mod.annotate(
+                    results["json_data"], cache_dir=scanner.RESULTS_DIR, enabled=True
+                )
+            results["epss_enabled"] = epss_enabled
+
+            # Record what this scan could not determine, before anything
+            # renders it.
+            from docksec import completeness as completeness_mod
+            scan_completeness = completeness_mod.build(
+                results,
+                dockerfile_errors=results.get("dockerfile_scan_errors"),
+                epss_enabled=epss_enabled,
+                epss_annotated=epss_annotated,
+                epss_candidates=epss_candidates,
+            )
+            results["completeness"] = scan_completeness.to_dict()
+
             # Calculate security score
             scanner.analysis_score = scanner.get_security_score(results)
 
@@ -625,6 +656,12 @@ def main() -> None:
             # scan that did not complete, not a policy violation.
             failed_services = _failed_service_names(results.get("failed_services"))
             scan_ok = not failed_services
+
+            # --incomplete-policy fail: a detection gap means findings may be
+            # missing, so CI can choose to treat that as a failed scan rather
+            # than a clean one.
+            if args.incomplete_policy == "fail" and (results.get("completeness") or {}).get("has_detection_gap"):
+                scan_ok = False
 
             if args.json_stdout:
                 _print_json_results(results, scanner, report_paths)
@@ -792,6 +829,11 @@ def _print_json_results(results, scanner, report_paths):
         "vulnerabilities": vulnerabilities,
         "severity_counts": output.count_by_severity(vulnerabilities),
     }
+    from docksec import epss as epss_mod
+
+    if results.get("completeness"):
+        payload["scan_info"]["completeness"] = results["completeness"]
+    payload["priority_counts"] = epss_mod.counts_by_priority(vulnerabilities)
     if results.get("suppressed_count"):
         payload["scan_info"]["suppressed_count"] = results["suppressed_count"]
         payload["scan_info"]["ignore_file"] = results.get("ignore_file")
@@ -808,16 +850,38 @@ def _print_json_results(results, scanner, report_paths):
 
 def _render_scan_summary(output, args, scanner, results, report_paths,
                          run_ai, run_compose_analysis):
-    """Render the consolidated result summary: severity table, score, a Quick
-    take action block, the generated reports, and a suggested next command."""
+    """Render the consolidated result summary.
+
+    Ordered so a reader gets the answer before the detail: what is here
+    (severity table, score), what to do first (priority tiers), what to run
+    (fix plan), and what was not checked (coverage).
+    """
+    from docksec import completeness as completeness_mod
+    from docksec import epss as epss_mod
+    from docksec import remediation as remediation_mod
+
     vulnerabilities = results.get("json_data", [])
     counts = output.count_by_severity(vulnerabilities)
 
     output.section("Results")
     output.severity_table(counts)
     output.score(getattr(scanner, "analysis_score", None))
+    output.priority_summary(epss_mod.counts_by_priority(vulnerabilities))
     output.quick_take(_quick_take_lines(results, counts, run_ai))
-    output.fix_commands(_suggest_fix_commands(results))
+
+    dockerfile_path = results.get("dockerfile_path")
+    if dockerfile_path and str(dockerfile_path).startswith("N/A"):
+        dockerfile_path = None
+    output.fix_plan(remediation_mod.build_plan(vulnerabilities, dockerfile_path))
+
+    gap_messages = [
+        gap["message"] for gap in (results.get("completeness") or {}).get("gaps", [])
+    ]
+    output.coverage(
+        completeness_mod.coverage_notes(results, ai_ran=bool(results.get("ai_findings"))),
+        gaps=gap_messages,
+    )
+
     if report_paths:
         output.report_results(report_paths, scanner.RESULTS_DIR)
     output.next_command(_suggest_next_command(args, results, run_ai, run_compose_analysis))
@@ -842,6 +906,8 @@ def _failed_service_names(failed_services):
 
 def _quick_take_lines(results, counts, run_ai):
     """Build a few high-signal lines summarizing what matters most."""
+    from docksec.enums import Severity
+
     lines = []
 
     vulnerabilities = results.get("json_data", [])
@@ -856,13 +922,18 @@ def _quick_take_lines(results, counts, run_ai):
         if fixable:
             lines.append(f"{fixable} of {total_vulns} have a fixed version available upstream")
 
-    dockerfile_scan = results.get("dockerfile_scan", {})
-    if not dockerfile_scan.get("skipped") and not dockerfile_scan.get("success"):
-        output_text = dockerfile_scan.get("output") or ""
-        issue_lines = [ln for ln in output_text.splitlines() if ln.strip()]
-        if issue_lines:
-            top = _format_hadolint_line(issue_lines[0].strip())
-            lines.append(f"{len(issue_lines)} Dockerfile lint issues; top: {top}")
+    # Dockerfile findings are structured and already counted in the severity
+    # table above; surface how many came from the Dockerfile specifically, since
+    # those are the ones the user can fix by editing a file they own.
+    dockerfile_findings = results.get("dockerfile_findings") or []
+    if dockerfile_findings:
+        worst = max(dockerfile_findings, key=lambda f: Severity.rank(f.get("Severity")))
+        location = f" (line {worst['Line']})" if worst.get("Line") else ""
+        lines.append(
+            f"{len(dockerfile_findings)} Dockerfile issue(s); most severe: "
+            f"{worst['VulnerabilityID']} [{worst['Severity']}] "
+            f"{worst['Title']}{location}"
+        )
 
     ai_findings = results.get("ai_findings") or {}
     exposed = ai_findings.get("exposed_credentials") or []

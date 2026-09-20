@@ -455,25 +455,61 @@ class TestDockerSecurityScanner(unittest.TestCase):
         self.assertEqual(results['image_name'], "test:latest")
         self.assertTrue(results['image_scan']['success'])
 
-    @patch('docksec.docker_scanner.DockerSecurityScanner.scan_dockerfile')
+    @patch('docksec.findings.scan_dockerfile_findings')
     @patch('docksec.docker_scanner.DockerSecurityScanner.scan_image')
     @patch('docksec.docker_scanner.DockerSecurityScanner.scan_image_json')
-    def test_run_full_scan(self, mock_json, mock_image, mock_dockerfile):
-        """Test full scan workflow."""
+    def test_run_full_scan(self, mock_json, mock_image, mock_findings):
+        """Test full scan workflow.
+
+        The Dockerfile pass now yields structured findings from Hadolint and
+        Trivy's config scanner rather than a text blob, so it is mocked at
+        docksec.findings.scan_dockerfile_findings.
+        """
         from docksec.docker_scanner import DockerSecurityScanner
-        
-        mock_dockerfile.return_value = (True, None)
+
+        mock_findings.return_value = ([], [])
         mock_image.return_value = (True, "output")
         mock_json.return_value = (True, [])
-        
+
         scanner = DockerSecurityScanner.__new__(DockerSecurityScanner)
         scanner.image_name = "test:latest"
         scanner.dockerfile_path = "Dockerfile"
         scanner.use_cache = False
-        
+
         results = scanner.run_full_scan()
         self.assertEqual(results['image_name'], "test:latest")
+        # No findings and no scanner errors: the Dockerfile pass succeeded.
         self.assertTrue(results['dockerfile_scan']['success'])
+
+    @patch('docksec.findings.scan_dockerfile_findings')
+    @patch('docksec.docker_scanner.DockerSecurityScanner.scan_image')
+    @patch('docksec.docker_scanner.DockerSecurityScanner.scan_image_json')
+    def test_run_full_scan_merges_dockerfile_findings(self, mock_json, mock_image, mock_findings):
+        """Dockerfile findings must land in json_data so they reach scoring,
+        reports, SARIF, and the --fail-on gate."""
+        from docksec.docker_scanner import DockerSecurityScanner
+
+        mock_findings.return_value = ([
+            {
+                "VulnerabilityID": "DS002",
+                "Severity": "HIGH",
+                "Title": "Image user should not be 'root'",
+                "PkgName": "dockerfile",
+                "Line": 7,
+            }
+        ], [])
+        mock_image.return_value = (True, "output")
+        mock_json.return_value = (True, [])
+
+        scanner = DockerSecurityScanner.__new__(DockerSecurityScanner)
+        scanner.image_name = "test:latest"
+        scanner.dockerfile_path = "Dockerfile"
+        scanner.use_cache = False
+
+        results = scanner.run_full_scan()
+        ids = [v["VulnerabilityID"] for v in results["json_data"]]
+        self.assertIn("DS002", ids)
+        self.assertFalse(results['dockerfile_scan']['success'])
 
     @patch('docksec.docker_scanner.subprocess.run')
     def test_advanced_scan_success(self, mock_run):

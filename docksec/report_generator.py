@@ -306,7 +306,7 @@ class ReportGenerator:
         if pkg:
             message = f"{message} ({pkg}{'@' + version if version else ''})"
 
-        region = ReportGenerator._sarif_region(vuln.get("Target"))
+        region = ReportGenerator._sarif_region(vuln.get("Target"), vuln.get("Line"))
         location = {
             "physicalLocation": {
                 "artifactLocation": {"uri": artifact_uri},
@@ -323,12 +323,21 @@ class ReportGenerator:
         }
 
     @staticmethod
-    def _sarif_region(target) -> Optional[Dict]:
-        """Extract a line-number region from a compose Target ('file:service:line').
+    def _sarif_region(target, line=None) -> Optional[Dict]:
+        """Build a SARIF region for a finding, when its position is known.
 
-        Trivy image-vulnerability targets carry a package path, not a line
-        number, so this only produces a region for compose findings.
+        Two sources, in order of reliability:
+
+        - ``line``: set directly by the Dockerfile scanners. Without this, a
+          Dockerfile finding lands on the file with no position and GitHub
+          cannot annotate the pull request line that caused it.
+        - a compose ``Target`` of the form ``file:service:line``.
+
+        Trivy image-vulnerability targets carry a package path rather than a
+        line number, so those correctly produce no region.
         """
+        if isinstance(line, int) and line > 0:
+            return {"startLine": line}
         if not target:
             return None
         parts = str(target).rsplit(":", 1)
