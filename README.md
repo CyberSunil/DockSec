@@ -155,10 +155,20 @@ docker run --rm -v "$PWD:/github/workspace" \
   ghcr.io/owasp/docksec:latest
 ```
 
-Published multi-arch (amd64 and arm64) on every release. Pin to a specific
-version (`ghcr.io/owasp/docksec:2026.9.21`) or a minor series
-(`ghcr.io/owasp/docksec:2026.9`) rather than `latest` in CI. Every image carries
-a build provenance attestation:
+Also published to Docker Hub as `owasp/docksec`:
+
+```bash
+docker run --rm -v "$PWD:/github/workspace" \
+  -e INPUT_DOCKERFILE=Dockerfile \
+  -e INPUT_SCAN_ONLY=true \
+  owasp/docksec:latest
+```
+
+Published multi-arch (amd64 and arm64) on every release, to both registries
+from the same build. Pin to a specific version (`ghcr.io/owasp/docksec:2026.9.21`,
+`owasp/docksec:2026.9.21`) or a minor series (`ghcr.io/owasp/docksec:2026.9`)
+rather than `latest` in CI. Every GHCR image carries a build provenance
+attestation:
 
 ```bash
 gh attestation verify oci://ghcr.io/owasp/docksec:latest --repo OWASP/DockSec
@@ -488,12 +498,14 @@ directly on pull requests and in the Security tab:
   with:
     dockerfile: 'Dockerfile'
     sarif: 'true'
+    output_dir: ${{ github.workspace }}/docksec-results
 
 - name: Upload SARIF to GitHub Code Scanning
   uses: github/codeql-action/upload-sarif@v3
   if: always()
   with:
-    sarif_file: ~/.docksec/results
+    sarif_file: docksec-results
+    category: docksec
 ```
 
 > `if: always()` is important: without it, the upload step is skipped whenever

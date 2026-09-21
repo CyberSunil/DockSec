@@ -17,7 +17,8 @@ docker run --rm -v "$PWD:/github/workspace" \
   ghcr.io/owasp/docksec:latest
 ```
 
-The image bundles pinned Trivy and Hadolint. If you prefer a local install:
+Also available on Docker Hub as `owasp/docksec:latest`. The image bundles
+pinned Trivy and Hadolint. If you prefer a local install:
 
 ```bash
 pip install docksec
