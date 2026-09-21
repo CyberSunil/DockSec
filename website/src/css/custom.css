@@ -1,0 +1,168 @@
+/**
+ * Design tokens and global styles.
+ *
+ * Everything visual is defined here as a custom property and consumed by the
+ * component CSS modules in src/components. Changing the palette should mean
+ * editing this file only - if a colour literal appears in a component, that is
+ * a bug worth fixing rather than copying.
+ *
+ * The palette is deliberately restrained: a security tool that looks like a
+ * marketing site invites the wrong kind of scepticism from the engineers who
+ * evaluate it.
+ */
+
+:root {
+  /* Brand. Docker-adjacent blue, darkened for AA contrast on white. */
+  --ifm-color-primary: #0b6bcb;
+  --ifm-color-primary-dark: #0a60b7;
+  --ifm-color-primary-darker: #095bad;
+  --ifm-color-primary-darkest: #084b8f;
+  --ifm-color-primary-light: #0c76df;
+  --ifm-color-primary-lighter: #0d7be9;
+  --ifm-color-primary-lightest: #2a8ff0;
+
+  --ifm-code-font-size: 0.9rem;
+  --ifm-font-family-monospace: ui-monospace, "SF Mono", "JetBrains Mono",
+    Menlo, Monaco, "Cascadia Code", "Roboto Mono", monospace;
+
+  /* Severity. These carry meaning, so they are named by role, never by hue. */
+  --ds-critical: #d22d2d;
+  --ds-high: #e06c00;
+  --ds-medium: #b58900;
+  --ds-low: #5a6570;
+  --ds-clean: #1a7f4b;
+
+  /* Surfaces */
+  --ds-surface: #ffffff;
+  --ds-surface-raised: #f6f8fa;
+  --ds-surface-sunken: #eef1f4;
+  --ds-border: #d8dee4;
+  --ds-text-muted: #57606a;
+
+  /* The terminal keeps its dark treatment in both themes: a terminal that is
+     white on black everywhere reads as a terminal, and the output we show was
+     captured from one. */
+  --ds-term-bg: #11161c;
+  --ds-term-fg: #d7dde4;
+  --ds-term-dim: #8b97a4;
+  --ds-term-border: #232c36;
+
+  /* Spacing scale. Multiples of 4 keep vertical rhythm predictable. */
+  --ds-space-xs: 0.25rem;
+  --ds-space-sm: 0.5rem;
+  --ds-space-md: 1rem;
+  --ds-space-lg: 2rem;
+  --ds-space-xl: 4rem;
+  --ds-radius: 10px;
+  --ds-radius-sm: 6px;
+
+  --ds-max-width: 1120px;
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #6db3f2;
+  --ifm-color-primary-dark: #4aa0ee;
+  --ifm-color-primary-darker: #3896ec;
+  --ifm-color-primary-darkest: #147ce4;
+  --ifm-color-primary-light: #90c6f6;
+  --ifm-color-primary-lighter: #a2cff8;
+  --ifm-color-primary-lightest: #d6e9fc;
+
+  --ifm-background-color: #0d1117;
+  --ifm-background-surface-color: #161b22;
+
+  /* Lightened for AA contrast against the dark background. */
+  --ds-critical: #ff6b6b;
+  --ds-high: #ffa657;
+  --ds-medium: #e3b341;
+  --ds-low: #8b949e;
+  --ds-clean: #3fb950;
+
+  --ds-surface: #0d1117;
+  --ds-surface-raised: #161b22;
+  --ds-surface-sunken: #010409;
+  --ds-border: #30363d;
+  --ds-text-muted: #9198a1;
+}
+
+/* Docusaurus renders code blocks before hydration; keep them from flashing. */
+html {
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Shared layout helpers, used by several landing-page sections. */
+.ds-container {
+  max-width: var(--ds-max-width);
+  margin: 0 auto;
+  padding: 0 var(--ds-space-md);
+}
+
+.ds-section {
+  padding: var(--ds-space-xl) 0;
+}
+
+.ds-section--alt {
+  background: var(--ds-surface-raised);
+  border-top: 1px solid var(--ds-border);
+  border-bottom: 1px solid var(--ds-border);
+}
+
+.ds-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ifm-color-primary);
+  margin-bottom: var(--ds-space-sm);
+}
+
+.ds-section-title {
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1.2;
+  margin: 0 0 var(--ds-space-sm);
+}
+
+.ds-section-lead {
+  color: var(--ds-text-muted);
+  max-width: 62ch;
+  margin: 0 0 var(--ds-space-lg);
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+/* Severity chips, reused in tables and the terminal legend. */
+.ds-sev {
+  display: inline-block;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--ds-radius-sm);
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+
+.ds-sev--critical { color: var(--ds-critical); }
+.ds-sev--high     { color: var(--ds-high); }
+.ds-sev--medium   { color: var(--ds-medium); }
+.ds-sev--low      { color: var(--ds-low); }
+.ds-sev--clean    { color: var(--ds-clean); }
+
+/* Respect the user's motion preference everywhere, not per-component. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Docusaurus's default table is cramped for the comparison grid. */
+.markdown table th,
+.markdown table td {
+  padding: 0.6rem 0.8rem;
+}

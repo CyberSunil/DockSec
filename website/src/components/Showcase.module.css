@@ -1,0 +1,46 @@
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ds-space-lg);
+  align-items: center;
+}
+
+@media (min-width: 997px) {
+  .split {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  }
+
+  .splitReverse .copy {
+    order: 2;
+  }
+}
+
+.copy p {
+  color: var(--ds-text-muted);
+  line-height: 1.65;
+}
+
+.stat {
+  display: flex;
+  gap: var(--ds-space-lg);
+  margin: var(--ds-space-md) 0;
+  flex-wrap: wrap;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+}
+
+.statValue {
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ifm-color-primary);
+}
+
+.statLabel {
+  font-size: 0.8rem;
+  color: var(--ds-text-muted);
+  margin-top: var(--ds-space-xs);
+}

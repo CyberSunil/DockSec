@@ -1,0 +1,115 @@
+.hero {
+  padding: var(--ds-space-xl) 0 var(--ds-space-lg);
+  background:
+    radial-gradient(
+      ellipse 80% 50% at 50% -20%,
+      color-mix(in srgb, var(--ifm-color-primary) 18%, transparent),
+      transparent
+    );
+}
+
+.inner {
+  max-width: var(--ds-max-width);
+  margin: 0 auto;
+  padding: 0 var(--ds-space-md);
+  text-align: center;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-xs);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ds-text-muted);
+  border: 1px solid var(--ds-border);
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  margin-bottom: var(--ds-space-md);
+  background: var(--ds-surface-raised);
+}
+
+.title {
+  font-size: clamp(2rem, 6vw, 3.5rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin: 0 0 var(--ds-space-md);
+  font-weight: 800;
+}
+
+.accent {
+  color: var(--ifm-color-primary);
+}
+
+.subtitle {
+  font-size: clamp(1rem, 2.2vw, 1.25rem);
+  line-height: 1.6;
+  color: var(--ds-text-muted);
+  max-width: 60ch;
+  margin: 0 auto var(--ds-space-lg);
+}
+
+.actions {
+  display: flex;
+  gap: var(--ds-space-sm);
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: var(--ds-space-lg);
+}
+
+/* The install command doubles as a button: it is the first thing a visitor
+   wants and copying it should not require selecting text by hand. */
+.install {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-sm);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.95rem;
+  background: var(--ds-term-bg);
+  color: var(--ds-term-fg);
+  border: 1px solid var(--ds-term-border);
+  border-radius: var(--ds-radius);
+  padding: 0.65rem 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.install:hover,
+.install:focus-visible {
+  border-color: var(--ifm-color-primary);
+}
+
+.installPrompt {
+  color: var(--ds-term-dim);
+  user-select: none;
+}
+
+.copyHint {
+  font-size: 0.75rem;
+  color: var(--ds-term-dim);
+  border-left: 1px solid var(--ds-term-border);
+  padding-left: var(--ds-space-sm);
+  min-width: 4.5rem;
+  text-align: left;
+}
+
+.trustRow {
+  display: flex;
+  gap: var(--ds-space-lg);
+  justify-content: center;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  color: var(--ds-text-muted);
+}
+
+.trustItem {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-xs);
+}
+
+@media (max-width: 640px) {
+  .trustRow {
+    gap: var(--ds-space-md);
+  }
+}
