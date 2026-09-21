@@ -8,7 +8,7 @@ const latestVersion = '2026.9.21';
 const config: Config = {
   title: 'OWASP DockSec',
   tagline: 'Which container findings actually matter, and what to do about them',
-  favicon: 'img/favicon.svg',
+  favicon: 'img/docksec-mark.png',
 
   // The site is served from GitHub Pages. owasp.org/DockSec/ can later be
   // pointed here as a redirect, the way owasp.org/cve-lite-cli/ is - that
@@ -76,7 +76,7 @@ const config: Config = {
   ],
 
   themeConfig: {
-    image: 'img/social-card.png',
+    image: 'img/docksec-logo.png',
     colorMode: {
       defaultMode: 'dark',
       // Deliberately left switchable: forcing a theme is a needless
@@ -101,10 +101,12 @@ const config: Config = {
       },
     ],
     navbar: {
-      title: 'DockSec',
+      // The wordmark already reads "DockSec", so no title text beside it.
       logo: {
         alt: 'OWASP DockSec',
-        src: 'img/logo.svg',
+        src: 'img/docksec-logo.png',
+        srcDark: 'img/docksec-logo.png',
+        width: 132,
       },
       items: [
         {to: '/docs/getting-started', label: 'Get started', position: 'left'},
@@ -113,6 +115,7 @@ const config: Config = {
         {to: '/docs/comparison', label: 'Compare', position: 'left'},
         {to: '/docs/case-studies', label: 'Case studies', position: 'left'},
         {to: '/docs/press', label: 'Press', position: 'left'},
+        {to: '/docs/about', label: 'About', position: 'left'},
         {
           href: 'https://owasp.org/www-project-docksec/',
           label: 'OWASP Project',
@@ -166,10 +169,16 @@ const config: Config = {
               label: 'Report an issue',
               href: 'https://github.com/OWASP/DockSec/issues',
             },
+            {label: 'About the project', to: '/docs/about'},
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} The OWASP Foundation. DockSec is released under the MIT License.`,
+      copyright:
+        `Created by <a href="https://github.com/advaitpatel">Advait Patel</a>, ` +
+        `with co-lead <a href="https://github.com/arkid15r">Arkadii Yakovets</a> ` +
+        `and the OWASP community.<br />` +
+        `Copyright © ${new Date().getFullYear()} The OWASP Foundation. ` +
+        `DockSec is released under the MIT License.`,
     },
     prism: {
       theme: prismThemes.github,
