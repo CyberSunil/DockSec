@@ -171,6 +171,9 @@ jobs:
       image_tag: ${{ needs.update-version.outputs.version }}
       # A pre-release publishes its own version tag but must not move :latest.
       publish_latest: ${{ !contains(needs.update-version.outputs.version, 'rc') && !contains(needs.update-version.outputs.version, '-') }}
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
   publish-github-release:
     needs: [update-version, publish-pypi]
