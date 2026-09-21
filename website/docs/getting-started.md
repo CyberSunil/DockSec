@@ -22,13 +22,21 @@ DockSec shells out to [Trivy](https://github.com/aquasecurity/trivy) and
 python -m docksec.setup_external_tools
 ```
 
-Prefer no install at all? The container bundles pinned versions of both:
+Prefer no install at all? The container bundles pinned versions of both, and is
+published to both GHCR and Docker Hub:
 
 ```bash
 docker run --rm -v "$PWD:/github/workspace" \
   -e INPUT_DOCKERFILE=Dockerfile \
   -e INPUT_SCAN_ONLY=true \
   ghcr.io/owasp/docksec:2026.9.21
+```
+
+```bash
+docker run --rm -v "$PWD:/github/workspace" \
+  -e INPUT_DOCKERFILE=Dockerfile \
+  -e INPUT_SCAN_ONLY=true \
+  owasp/docksec:2026.9.21
 ```
 
 ## First scan
