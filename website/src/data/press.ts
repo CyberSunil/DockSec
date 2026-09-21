@@ -41,6 +41,16 @@ export type PressItem = {
 /** Written coverage, newest first. */
 export const MEDIA: PressItem[] = [
   {
+    outlet: 'HackerNoon',
+    title:
+      "The Engineer's Guide to Closing the Triage Gap: Implementing OWASP DockSec in High-Velocity Pipelines",
+    url: 'https://hackernoon.com/the-engineers-guide-to-closing-the-triage-gap-implementing-owasp-docksec-in-high-velocity-pipeline',
+    date: '2026-06-09',
+    featured: true,
+    summary:
+      'An independent implementation guide covering how to wire DockSec into a fast-moving CI pipeline.',
+  },
+  {
     outlet: 'Help Net Security',
     title: '20 open-source cybersecurity tools to keep your team ready for anything',
     url: 'https://www.helpnetsecurity.com/2026/07/08/20-latest-open-source-cybersecurity-tools/',
@@ -273,6 +283,22 @@ export const MEDIA: PressItem[] = [
 /** Podcasts, YouTube interviews, streams, recorded panels. */
 export const PODCASTS: PressItem[] = [
   {
+    outlet: 'ISACA Podcast',
+    title: 'Your Containers Are Probably Full of Holes: Fixing Docker Security with AI',
+    url: 'https://www.youtube.com/watch?v=Zls_3loAT84',
+    date: '2026',
+    author: 'Advait Patel',
+    featured: true,
+  },
+  {
+    outlet: 'The Elephant in AppSec',
+    title: "The Docker mistakes everyone's still making and how to fix them",
+    url: 'https://youtu.be/pPISQ1QPytc',
+    date: '2026',
+    author: 'Advait Patel',
+    featured: true,
+  },
+  {
     outlet: 'Mr. Cloud Book',
     title: 'DockSec: How to Fix Docker Security Issues in One Command',
     url: 'https://www.youtube.com/watch?v=ier7z8lZRfA',
@@ -290,7 +316,113 @@ export const PODCASTS: PressItem[] = [
 ];
 
 /** Conference talks, workshops and meetups. */
-export const TALKS: PressItem[] = [];
+export const TALKS: PressItem[] = [
+  {
+    outlet: 'OWASP Global AppSec EU',
+    title: 'DockSec live workshop',
+    url: 'https://owasp.org/www-project-docksec/',
+    date: '2026',
+    author: 'Advait Patel',
+    location: 'Vienna, Austria',
+    featured: true,
+    summary: 'A hands-on workshop running DockSec against real container stacks.',
+  },
+  {
+    outlet: 'OWASP SnowFROC',
+    title: 'DockSec: closing the container security triage gap',
+    url: 'https://owasp.org/www-project-docksec/',
+    date: '2026',
+    author: 'Advait Patel',
+    location: 'Denver, Colorado',
+    featured: true,
+  },
+  {
+    outlet: 'Open Cloud Security Conference',
+    title: 'Securing Docker with AI: DockSec + GPT for Container Security',
+    url: 'https://www.youtube.com/watch?v=8yT5Y28M6oo',
+    date: '2025',
+    author: 'Advait Patel',
+    featured: true,
+    summary: 'Hosted by Prowler. Recording available.',
+  },
+  {
+    outlet: 'OWASP Global AppSec USA',
+    title: 'DockSec: container security triage in practice',
+    url: 'https://owasp.org/www-project-docksec/',
+    date: '2025',
+    author: 'Advait Patel',
+    location: 'Washington, DC',
+    featured: true,
+  },
+  {
+    outlet: 'Silicon Valley Cybersecurity Conference',
+    title: 'AI-assisted container security remediation',
+    url: 'https://owasp.org/www-project-docksec/',
+    date: '2025',
+    author: 'Advait Patel',
+    location: 'San Jose, California',
+  },
+  {
+    outlet: 'IEEE EIT',
+    title: 'International Conference on Electro/Information Technology',
+    url: 'https://owasp.org/www-project-docksec/',
+    date: '2025',
+    author: 'Advait Patel',
+    summary: 'Sponsored by IEEE Region 4 and IEEE-USA.',
+  },
+];
+
+/**
+ * Written by the project lead. Kept separate from MEDIA on purpose: a
+ * maintainer's own article is useful background, not independent validation,
+ * and presenting the two together would blur that line.
+ */
+export const AUTHORED: PressItem[] = [
+  {
+    outlet: 'SecureWorld',
+    title: 'The DockSec Series, Part 1: Why Container Security Needs an AI Layer',
+    url: 'https://www.secureworld.io/industry-news/docksec-series-container-security-ai-layer',
+    date: '2026-07-07',
+    author: 'Advait Patel',
+    featured: true,
+  },
+  {
+    outlet: 'SecureWorld',
+    title: 'The DockSec Series, Part 2: Inside DockSec - Architecture and Pipeline',
+    url: 'https://www.secureworld.io/industry-news/docksec-series-part-2-architecture-pipeline',
+    date: '2026-07-14',
+    author: 'Advait Patel',
+  },
+  {
+    outlet: 'SecureWorld',
+    title:
+      'The DockSec Series, Part 3: Hands-On Scanning - Dockerfiles, Images, and Compose',
+    url: 'https://www.secureworld.io/industry-news/docksec-series-part-3-scanning',
+    date: '2026-07-21',
+    author: 'Advait Patel',
+  },
+  {
+    outlet: 'SecureWorld',
+    title: 'The DockSec Series, Part 4: Shift-Left - Gating, SARIF, and Baselines in CI/CD',
+    url: 'https://www.secureworld.io/industry-news/docksec-series-part-4-shift-left',
+    date: '2026-07-28',
+    author: 'Advait Patel',
+  },
+  {
+    outlet: 'SecureWorld',
+    title: 'The DockSec Series, Part 5: Adoption, Scoring, and Measuring Container Posture',
+    url: 'https://www.secureworld.io/industry-news/docksec-part-5-adoption-scoring-measuring',
+    date: '2026-08-04',
+    author: 'Advait Patel',
+  },
+  {
+    outlet: 'HackerNoon',
+    title: 'How DockSec Solves Docker Security Problems with AI-Driven Automation',
+    url: 'https://hackernoon.com/how-docksec-solves-docker-security-problems-with-ai-driven-automation',
+    date: '2025-05-05',
+    author: 'Advait Patel',
+  },
+];
 
 export const PRESS_SECTIONS = [
   {
@@ -309,8 +441,15 @@ export const PRESS_SECTIONS = [
   {
     id: 'talks',
     heading: 'Conference talks',
-    blurb: 'Where DockSec has been presented.',
+    blurb: 'Where DockSec has been presented, including OWASP Global AppSec and IEEE.',
     items: TALKS,
+  },
+  {
+    id: 'authored',
+    heading: 'Written by the project lead',
+    blurb:
+      'Background and deep dives from Advait Patel. Listed separately from independent coverage.',
+    items: AUTHORED,
   },
 ];
 

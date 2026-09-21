@@ -166,3 +166,20 @@ html {
 .markdown table td {
   padding: 0.6rem 0.8rem;
 }
+
+/* The wordmark PNG has a white background. On the dark navbar that would show
+   as a white slab, so give it a light plate in both themes - a small rounded
+   panel reads as deliberate, where a raw white rectangle reads as a mistake. */
+.navbar__logo {
+  height: 2rem;
+  display: flex;
+  align-items: center;
+}
+
+.navbar__logo img {
+  border-radius: 6px;
+  background: #ffffff;
+  padding: 3px 6px;
+  height: 100%;
+  width: auto;
+}

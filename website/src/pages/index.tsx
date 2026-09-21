@@ -110,6 +110,18 @@ export default function Home(): React.ReactElement {
               What it does not do
             </Link>
           </div>
+
+          <p
+            style={{
+              marginTop: 'var(--ds-space-lg)',
+              marginBottom: 0,
+              fontSize: '0.9rem',
+              color: 'var(--ds-text-muted)',
+            }}>
+            An OWASP Lab Project, created by{' '}
+            <a href="https://github.com/advaitpatel">Advait Patel</a> and built in the
+            open. <Link to="/docs/about">About the project →</Link>
+          </p>
         </div>
       </section>
     </Layout>

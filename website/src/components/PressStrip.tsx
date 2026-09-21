@@ -1,45 +1,96 @@
 import Link from '@docusaurus/Link';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 import React from 'react';
-import {MEDIA, PRESS_COUNTS} from '../data/press';
+import {AUTHORED, MEDIA, PODCASTS, TALKS} from '../data/press';
 import styles from './PressStrip.module.css';
 
 /**
- * Social proof on the landing page. Names are pulled from the same verified
- * data as the press page, so this cannot drift from what is actually listed.
+ * Social proof on the landing page, built from the same verified data as the
+ * press page so the two cannot drift.
+ *
+ * Outlets render as typographic plates rather than logo images: publications
+ * rarely license their marks for third-party use, and the favicons they do
+ * expose are 16px, which looks worse scaled up than clean type does. Supply
+ * `logo` on an entry and that image is used instead.
  */
+
+type Outlet = {name: string; kicker: string; href: string; logo?: string};
+
+/** Curated, in the order they should read. */
+const OUTLETS: Outlet[] = [
+  {
+    name: 'Help Net Security',
+    kicker: '4 features',
+    href: 'https://www.helpnetsecurity.com/2026/06/08/docksec-open-source-ai-docker-security-scanner/',
+  },
+  {
+    name: 'SecurityWeek',
+    kicker: 'Coverage',
+    href: 'https://www.securityweek.com/open-source-docksec-uses-ai-to-cut-through-vulnerability-noise-in-docker-images/',
+  },
+  {
+    name: 'SC World',
+    kicker: 'Coverage',
+    href: 'https://www.scworld.com/news/docker-security-scanner-uses-ai-to-help-explain-fix-vulnerabilities',
+  },
+  {
+    name: 'ReversingLabs',
+    kicker: 'Analysis',
+    href: 'https://www.reversinglabs.com/blog/owasp-adopts-docksec',
+  },
+  {
+    name: 'ISACA',
+    kicker: 'Podcast',
+    href: 'https://www.youtube.com/watch?v=Zls_3loAT84',
+  },
+  {
+    name: 'OWASP Global AppSec',
+    kicker: 'Talk + workshop',
+    href: 'https://owasp.org/www-project-docksec/',
+  },
+];
+
+function OutletPlate({outlet}: {outlet: Outlet}): React.ReactElement {
+  const logoUrl = useBaseUrl(outlet.logo ?? '');
+  return (
+    <li className={styles.outlet}>
+      <a
+        className={styles.plate}
+        href={outlet.href}
+        target="_blank"
+        rel="noopener noreferrer">
+        {outlet.logo ? (
+          <img className={styles.logo} src={logoUrl} alt={outlet.name} loading="lazy" />
+        ) : (
+          <>
+            <span className={styles.name}>{outlet.name}</span>
+            <span className={styles.kicker}>{outlet.kicker}</span>
+          </>
+        )}
+      </a>
+    </li>
+  );
+}
+
 export default function PressStrip(): React.ReactElement | null {
-  const featured = MEDIA.filter((item) => item.featured);
-  if (featured.length === 0) {
+  const total = MEDIA.length + PODCASTS.length + TALKS.length + AUTHORED.length;
+  if (total === 0) {
     return null;
   }
-
-  // One row per outlet, even where an outlet covered DockSec several times.
-  const seen = new Set<string>();
-  const outlets = featured.filter((item) => {
-    if (seen.has(item.outlet)) {
-      return false;
-    }
-    seen.add(item.outlet);
-    return true;
-  });
 
   return (
     <section className={styles.strip}>
       <div className="ds-container">
-        <p className={styles.label}>As covered by</p>
+        <p className={styles.label}>Covered by</p>
         <ul className={styles.outlets}>
-          {outlets.map((item) => (
-            <li key={item.outlet} className={styles.outlet}>
-              <a href={item.url} target="_blank" rel="noopener noreferrer">
-                {item.outlet}
-              </a>
-            </li>
+          {OUTLETS.map((outlet) => (
+            <OutletPlate key={outlet.name} outlet={outlet} />
           ))}
         </ul>
         <p className={styles.more}>
           <Link to="/docs/press">
-            {PRESS_COUNTS.media + PRESS_COUNTS.video} pieces of coverage across{' '}
-            {PRESS_COUNTS.outlets} outlets →
+            {total} articles, talks and podcasts across {new Set(MEDIA.map((m) => m.outlet)).size}+
+            outlets →
           </Link>
         </p>
       </div>

@@ -47,6 +47,7 @@ const sidebars: SidebarsConfig = {
       items: ['cli-reference', 'ci', 'examples'],
     },
     'press',
+    'about',
   ],
 };
 
