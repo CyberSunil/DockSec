@@ -1,9 +1,10 @@
 name: Publish Container Image
 
-# Publishes the DockSec image to GitHub Container Registry so evaluators can run
-# a scan with no install:
+# Publishes the DockSec image to GitHub Container Registry and Docker Hub so
+# evaluators can run a scan with no install:
 #
 #   docker run --rm -v "$PWD:/github/workspace" ghcr.io/owasp/docksec <args>
+#   docker run --rm -v "$PWD:/github/workspace" owasp/docksec <args>
 #
 # Runs on release tags and can be dispatched manually. The image is built for
 # amd64 and arm64: CI runners are amd64, but a large share of developer laptops
@@ -31,6 +32,11 @@ on:
         required: false
         default: false
         type: boolean
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
 
   # Retained for a tag pushed by a person, where the trigger does fire.
   push:
@@ -93,15 +99,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Log in to Docker Hub
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       # Tagging:
       #   v2026.9.20 -> :2026.9.20, :2026.9, :latest
       # A moving major/minor tag lets users pin at the granularity they want.
       # `latest` only moves on a real tag push, never on a manual test build.
+      # Both registries get the same tag set from one metadata-action call.
       - name: Derive image tags
         id: meta
         uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
         with:
-          images: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
+          images: |
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
+            docker.io/owasp/docksec
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -109,7 +124,7 @@ jobs:
             # pre-release are passed in explicitly, because github.ref is the
             # caller's ref rather than the tag.
             type=raw,value=${{ inputs.image_tag }},enable=${{ inputs.image_tag != '' }}
-            type=raw,value=latest,enable=${{ inputs.publish_latest }}
+            type=raw,value=latest,enable=${{ inputs.publish_latest == true }}
             # Tag push or manual dispatch. `latest` must not follow a
             # pre-release: it is what every `docker run ghcr.io/owasp/docksec`
             # in the README resolves to.

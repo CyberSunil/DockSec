@@ -1,0 +1,29 @@
+# The same service, hardened. Scan both and compare.
+# Multi-stage keeps build tooling out of the runtime image; the digest pin makes
+# the base image reproducible; the service runs unprivileged.
+FROM node:22.11.0-alpine@sha256:cb7cd40ba6483f37f791e1aace576df449fc5f75eef3d2cd84d70d7c5c25a53a AS build
+
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+COPY . .
+
+FROM node:22.11.0-alpine@sha256:cb7cd40ba6483f37f791e1aace576df449fc5f75eef3d2cd84d70d7c5c25a53a
+
+WORKDIR /app
+
+# Secrets arrive at runtime, never baked into a layer.
+ENV NODE_ENV=production
+
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app ./
+
+USER node
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://127.0.0.1:3000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+
+CMD ["node", "server.js"]

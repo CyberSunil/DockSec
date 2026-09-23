@@ -1,0 +1,81 @@
+.strip {
+  border-top: 1px solid var(--ds-border);
+  border-bottom: 1px solid var(--ds-border);
+  padding: var(--ds-space-lg) 0;
+  background: var(--ds-surface-sunken);
+}
+
+.label {
+  text-align: center;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ds-text-muted);
+  margin-bottom: var(--ds-space-md);
+}
+
+.outlets {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: var(--ds-space-sm);
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--ds-space-md);
+}
+
+.outlet {
+  display: flex;
+}
+
+/* Each outlet renders as a bordered plate. Publications rarely license their
+   logos for third-party use and their favicons are 16px, so a typographic
+   treatment is both safer and sharper than a scaled-up icon. A logo image is
+   used instead whenever one is supplied in the data. */
+.plate {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 9.5rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+  background: var(--ds-surface);
+  text-decoration: none;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.plate:hover,
+.plate:focus-visible {
+  border-color: var(--ifm-color-primary);
+  transform: translateY(-2px);
+  text-decoration: none;
+}
+
+.name {
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--ifm-font-color-base);
+}
+
+.kicker {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ds-text-muted);
+}
+
+.logo {
+  max-height: 1.6rem;
+  width: auto;
+  object-fit: contain;
+}
+
+.more {
+  text-align: center;
+  font-size: 0.85rem;
+}

@@ -16,6 +16,7 @@ import re
 from typing import Dict, List, Optional
 
 from docksec.enums import Severity
+from docksec.epss import priority_rank
 
 # Dockerfile rules with a deterministic edit. Maps a rule ID to a short
 # instruction and, where the change is mechanical enough to apply
@@ -212,13 +213,25 @@ def build_plan(findings: List[Dict], dockerfile_path: Optional[str] = None) -> F
             "fixed": fixed,
             "manager": _package_manager_hint(finding),
             "severity": finding.get("Severity"),
+            "priority": finding.get("Priority"),
             "finding_count": 0,
             "ids": [],
         })
         entry["finding_count"] += 1
         vuln_id = finding.get("VulnerabilityID")
-        if vuln_id and len(entry["ids"]) < 3:
-            entry["ids"].append(vuln_id)
+        finding_priority = finding.get("Priority")
+        more_urgent = priority_rank(finding_priority) > priority_rank(entry["priority"])
+        if vuln_id and vuln_id not in entry["ids"]:
+            if len(entry["ids"]) < 3:
+                entry["ids"].append(vuln_id)
+            elif more_urgent:
+                # The displayed IDs are capped, so make sure the one driving
+                # this entry's priority is not the one left out.
+                entry["ids"][-1] = vuln_id
+        # One upgrade covers every finding against the package, so the entry
+        # carries the most urgent tier any of them reached.
+        if more_urgent:
+            entry["priority"] = finding_priority
         if Severity.rank(finding.get("Severity")) > Severity.rank(entry["severity"]):
             entry["severity"] = finding.get("Severity")
         # Upgrading once must satisfy every finding against this package.
@@ -233,8 +246,16 @@ def build_plan(findings: List[Dict], dockerfile_path: Optional[str] = None) -> F
             entry["package"], entry["fixed"], entry["manager"]
         )
         plan.package_upgrades.append(entry)
+    # EPSS priority leads the ordering: the whole point of computing a tier is
+    # that a HIGH with real exploitation beats a CRITICAL nobody is exploiting.
+    # Severity breaks ties within a tier, and the package name keeps the output
+    # stable between runs.
     plan.package_upgrades.sort(
-        key=lambda e: (-Severity.rank(e["severity"]), e["package"])
+        key=lambda e: (
+            -priority_rank(e.get("priority")),
+            -Severity.rank(e["severity"]),
+            e["package"],
+        )
     )
 
     # Dockerfile and compose edits, deduplicated by rule.

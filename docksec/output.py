@@ -260,19 +260,27 @@ def fix_plan(plan) -> None:
     console = get_console()
 
     if plan.package_upgrades:
+        from docksec.epss import PRIORITY_LABELS
+
         console.print()
         _line(Text("Fix commands", style="bold cyan"))
         for item in plan.package_upgrades:
             ids = ", ".join(item["ids"])
             more = "" if item["finding_count"] <= len(item["ids"]) else f" +{item['finding_count'] - len(item['ids'])}"
             _line(Text.assemble(("  > ", "dim"), (item["command"], "green")))
-            _line(
-                Text(
-                    f"      {item['severity']} - {item['installed']} -> {item['fixed']}"
-                    f"  ({ids}{more})",
-                    style="dim",
-                )
+            # The commands are ordered by priority, which is invisible in a long
+            # list unless each row says which tier put it there.
+            priority = item.get("priority")
+            label = PRIORITY_LABELS.get(priority) if priority else None
+            detail = Text("      ", style="dim")
+            if label:
+                detail.append(f"{label}  ", style=_PRIORITY_STYLES.get(priority, "default"))
+            detail.append(
+                f"{item['severity']} - {item['installed']} -> {item['fixed']}"
+                f"  ({ids}{more})",
+                style="dim",
             )
+            _line(detail)
 
     if plan.dockerfile_edits:
         console.print()

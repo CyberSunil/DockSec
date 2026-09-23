@@ -6,6 +6,37 @@ All notable changes to DockSec are documented in this file.
 
 ### Added (adoption)
 
+- **Golden-file tests for the three output surfaces.** The terminal summary,
+  the `--json` payload and the SARIF report are now compared against stored
+  files, so an unintended change to any of them fails CI rather than reaching
+  a user. Re-record deliberately with `DOCKSEC_UPDATE_GOLDEN=1 pytest
+  tests/test_golden_output.py` and review the diff. This closes the gap that
+  let the fix-command ordering and the SARIF severity fallback change without
+  a test noticing.
+
+- **Ten examples with documented expected findings**
+  (`examples/README.md`). Eight Dockerfiles across Node, Python, Java, Go and
+  BuildKit secret mounts, plus the two compose stacks, each insecure file
+  paired with a hardened counterpart so the delta is the lesson. Two are
+  deliberately instructive: the distroless Go image reports a HEALTHCHECK
+  finding that is correct to keep, and the BuildKit example passes a secret to
+  a build without tripping the secret rule.
+
+- **Three case studies against official images** (`docs/case-studies/`):
+  `node:18` (2,200 findings, 9 worth acting on today), `python:3.12-slim`
+  (44 findings, none with an available fix), and `nginx:1.31.6-alpine`
+  (clean, and what that does not prove). Official images were chosen so the
+  numbers are reproducible and no third party is named unfavourably.
+
+- **Pull-request comment mode**, as a two-stage workflow. `pr-scan.yml` runs
+  in the untrusted pull-request context with `contents: read` and no secrets,
+  and emits data only; `pr-comment.yml` runs on `workflow_run` in the base
+  repository, reads just that artifact, and renders the comment. The renderer
+  escapes every value it prints, because a fork controls the text of its own
+  findings; the PR number is validated as an integer before use. The comment
+  is updated in place rather than reposted, and rows lead with `Fix Now`.
+
+
 - **`docksec --fix`** applies the mechanical subset of the suggested Dockerfile
   changes, re-scans, and reports the before/after finding counts. It adds a
   non-root `USER` before `CMD`, inserts a placeholder `HEALTHCHECK`, adds
@@ -49,6 +80,57 @@ All notable changes to DockSec are documented in this file.
   over the tool it wraps, and ends with a list of what DockSec does not do.
 
 ### Fixed
+
+- Refreshed the hardened compose example's base images (`nginx:1.25.3-alpine` ->
+  `1.31.6-alpine`, `postgres:15.5-alpine` -> `15.19-alpine`). The old pins dated
+  from June and carried 35 CRITICAL/HIGH CVEs, which nothing surfaced while the
+  example's images were silently failing to scan. nginx is now clean; the
+  remaining 22 findings are all in the Go `stdlib` compiled into the official
+  postgres image, which has no fix available upstream at any tag - `18.6-alpine`
+  reports exactly the same 22, so staying on the 15 line costs nothing and keeps
+  the example about configuration rather than a major version upgrade.
+
+- CodeQL now scans the workflow files themselves (`language: actions`). It was
+  already expecting that configuration and warned on every pull request that it
+  could not find one, so workflow changes were going unanalyzed.
+
+- **The container image ignored every command-line argument.** `entrypoint.sh`
+  built its argument list only from the Action's `INPUT_*` variables and never
+  forwarded `"$@"`, so `docker run ghcr.io/owasp/docksec:latest --version` and
+  `--help` - the first two commands anyone runs against an unfamiliar image -
+  both failed with "Dockerfile path is required". The Action path was
+  unaffected. Command-line arguments are now appended after the `INPUT_*`
+  handling, so both forms work and can be combined.
+
+- **Fix commands ignored the EPSS priority DockSec had just computed.** The
+  output printed a `Fix Now` / `Fix Soon` breakdown and then ordered the
+  commands by severity and package name, so on a Postgres image the three
+  genuinely-exploited OpenSSL CVEs sat alphabetically among 160+ lower-priority
+  entries with nothing marking them. Commands are now ordered by priority tier
+  first, each row is labelled with its tier, and where several CVEs share a
+  package the one driving the tier is kept in the displayed IDs.
+
+- **SARIF reported no severity for findings without a CVSS score.** The
+  `security-severity` property was set to `str(CVSS or "")`, which is an empty
+  string for every Hadolint and `trivy config` rule and for many CVEs - 14 of 25
+  rules on an nginx scan. GitHub Code Scanning ranks by that property, so those
+  findings did not surface at the severity DockSec assigned. It now falls back
+  to the severity band when no CVSS score is available.
+
+- **SARIF carried no EPSS data.** Code Scanning users, the largest integration
+  surface, saw none of the exploitation signal driving DockSec's own ordering.
+  Results now carry `epss`, `epssPercentile` and `priority` properties.
+
+- **Compose scans never pulled images.** A service whose image was not already
+  local failed with "not found locally", so on a clean machine or a fresh CI
+  runner the insecure compose example reported both services unscanned and
+  scored from static rules alone. Missing images are now pulled on demand. This
+  never happens under `--offline`, and can be disabled with
+  `DOCKSEC_PULL_MISSING_IMAGES=false`.
+
+- Coverage notes now state the Trivy and Hadolint versions used. The published
+  image pins versions a local install does not, so the same Dockerfile could
+  yield 9 findings locally and 11 in CI with nothing explaining the difference.
 
 - DockSec's own Dockerfile was missing `--no-install-recommends`, which the new
   self-scan caught. The root-user finding is waived in a committed

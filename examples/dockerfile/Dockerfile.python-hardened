@@ -1,0 +1,31 @@
+# The same service, hardened. Build dependencies stay in the build stage, so a
+# compiler is never present in the image that faces the network.
+FROM python:3.12.7-slim@sha256:af4e85f1cac90dd3771e47292ea7c8a9830abfabbe4faa5c53f158854c2e819d AS build
+
+WORKDIR /srv
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY requirements.txt ./
+RUN pip install --no-cache-dir --require-hashes -r requirements.txt
+
+FROM python:3.12.7-slim@sha256:af4e85f1cac90dd3771e47292ea7c8a9830abfabbe4faa5c53f158854c2e819d
+
+WORKDIR /srv
+
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+COPY --from=build /opt/venv /opt/venv
+COPY --chown=nobody:nogroup . .
+
+USER nobody
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health').status==200 else 1)"
+
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "app:app"]

@@ -1,0 +1,31 @@
+
+Results
+
+┌──────────┬──────┬────────┬─────┐
+│ Critical │ High │ Medium │ Low │
+├──────────┼──────┼────────┼─────┤
+│    1     │  3   │   1    │  0  │
+└──────────┴──────┴────────┴─────┘
+
+Security Score  41.5 / 100   POOR
+
+Priority
+  Fix Now       1
+  Fix Soon      1
+
+Fix commands
+  > upgrade openssl to 3.5.7
+      Fix Now  HIGH - 3.5.1 -> 3.5.7  (CVE-2025-15467)
+  > upgrade libperl to 5.40.2
+      Fix Soon  CRITICAL - 5.40.1 -> 5.40.2  (CVE-2026-31789)
+
+Dockerfile changes
+  - [HIGH] Add a non-root USER before CMD/ENTRYPOINT (line 7)
+
+Compose changes
+  - [HIGH] Move the value to a Docker secret and reference it with a _FILE variable (db)
+
+Applying all of the above resolves 4 of 5 finding(s); 1 has no mechanical fix yet.
+
+Coverage
+  . Findings are matched against advisory data; exploitability and runtime reachability are not proven.

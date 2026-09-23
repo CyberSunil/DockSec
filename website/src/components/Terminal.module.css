@@ -1,0 +1,83 @@
+.window {
+  background: var(--ds-term-bg);
+  border: 1px solid var(--ds-term-border);
+  border-radius: var(--ds-radius);
+  overflow: hidden;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  max-width: 820px;
+  margin: 0 auto;
+}
+
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-sm);
+  padding: 0.6rem 0.9rem;
+  background: color-mix(in srgb, var(--ds-term-bg) 80%, #ffffff 6%);
+  border-bottom: 1px solid var(--ds-term-border);
+}
+
+.dots {
+  display: flex;
+  gap: 6px;
+}
+
+.dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #3a444f;
+}
+
+.titleText {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.75rem;
+  color: var(--ds-term-dim);
+  margin-left: auto;
+}
+
+.body {
+  padding: var(--ds-space-md);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.82rem;
+  line-height: 1.65;
+  color: var(--ds-term-fg);
+  overflow-x: auto;
+  /* Long scans are tall; cap the height rather than push the page down. */
+  max-height: 30rem;
+  overflow-y: auto;
+}
+
+.line {
+  white-space: pre;
+}
+
+.command {
+  color: var(--ds-term-fg);
+}
+
+.prompt {
+  color: var(--ds-clean);
+  user-select: none;
+}
+
+.dim {
+  color: var(--ds-term-dim);
+}
+
+.heading {
+  color: #7fb3f0;
+  font-weight: 700;
+}
+
+.critical { color: var(--ds-critical); font-weight: 700; }
+.high     { color: var(--ds-high); font-weight: 700; }
+.fixnow   { color: var(--ds-critical); font-weight: 700; }
+.good     { color: var(--ds-clean); }
+
+.caption {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--ds-text-muted);
+  margin-top: var(--ds-space-md);
+}
