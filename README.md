@@ -37,8 +37,7 @@ Instead of overwhelming you with a list of 200+ CVEs, DockSec:
 - **Suggests** specific fixes for your Dockerfile.
 - **Generates** professional, interactive security reports for your team.
 
-Everything scans locally; the only thing that ever leaves your machine is the (secret-redacted) file content sent to the AI provider you choose - and with a local model or scan-only mode, nothing leaves at all. See [Data flow and privacy](#data-flow-and-privacy).
-
+Everything scans locally. When enabled, DockSec sends only the data required for EPSS lookups or AI analysis, with secrets redacted before AI requests. With a local model, scan-only mode, or offline mode, no scan data leaves your machine. See [Data flow and privacy](#data-flow-and-privacy).
 ---
 
 ## How It Works
